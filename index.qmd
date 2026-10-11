@@ -1,0 +1,57 @@
+---
+from: markdown+emoji
+execute: 
+  cache: true
+format: 
+  letterbox-revealjs:
+    theme: custom.scss
+    progress: false
+    menu: false
+    width: 1280
+    height: 720
+filters:
+  - custom-callouts
+callout-appearance: simple
+---
+
+```{r}
+#| label: setup
+#| include: false
+```
+
+##
+
+::: columns
+::: {.column width="37.5%"}
+:::
+::: {.column width="60%"}
+
+::: {.title data-id="title"}
+Graphs for forecasting  
+many related time series
+:::
+
+::: {.dateplace}
+23rd October 2026 @ University of Melbourne
+:::
+
+<br>
+
+Mitchell O'Hara-Wild, Monash University
+
+<br><br>
+
+::: {.callout-link}
+
+## Useful links
+
+![](resources/forum.svg){.icon} [social.mitchelloharawild.com](https://social.mitchelloharawild.com/)
+
+![](resources/projector-screen-outline.svg){.icon} [slides.mitchelloharawild.com/UoM2026](https://slides.mitchelloharawild.com/UoM2026)
+
+![](resources/github.svg){.icon} [mitchelloharawild/talk-graph-temporal-uom2026](https://github.com/mitchelloharawild/talk-graph-temporal-uom2026)
+
+:::
+
+:::
+:::
