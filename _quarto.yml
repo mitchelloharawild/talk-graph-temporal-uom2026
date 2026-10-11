@@ -1,0 +1,14 @@
+project:
+  type: website
+
+format:
+  revealjs:
+    # main slide deck entry
+    self-contained: false
+    theme: default
+
+# default document
+metadata:
+  # index.qmd will be the main slide deck
+  execute:
+    echo: false
