@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-27.44 -53 553.32 159" width="553.32" height="159">
+<rect x="0" y="0" width="385.2" height="46" rx="6" fill="#f6f8fa" stroke="#d0d7de"/>
+<path d="M13,-4 L13,-10 L36.2,-10 L36.2,-4" fill="none" stroke="#c2410c" stroke-width="1.5" stroke-linejoin="round"/>
+<text x="24.6" y="-31" font-family="'Fira Code', 'DejaVu Sans Mono', Menlo, Consolas, monospace" font-size="13" fill="#c2410c" font-weight="bold" text-anchor="middle">model</text>
+<text x="24.6" y="-18" font-family="'Helvetica Neue', Arial, sans-serif" font-size="11" fill="#57606a" font-weight="normal" text-anchor="middle">model function</text>
+<path d="M46.6,-4 L46.6,-10 L363.8,-10 L363.8,-4" fill="none" stroke="#c2410c" stroke-width="1.5" stroke-linejoin="round" stroke-dasharray="4 3"/>
+<text x="205.2" y="-31" font-family="'Fira Code', 'DejaVu Sans Mono', Menlo, Consolas, monospace" font-size="13" fill="#c2410c" font-weight="bold" text-anchor="middle">formula</text>
+<text x="205.2" y="-18" font-family="'Helvetica Neue', Arial, sans-serif" font-size="11" fill="#57606a" font-weight="normal" text-anchor="middle">one syntax for every model</text>
+<path d="M46.6,50 L46.6,56 L128.6,56 L128.6,50" fill="none" stroke="#c2410c" stroke-width="1.5" stroke-linejoin="round"/>
+<text x="87.6" y="78" font-family="'Fira Code', 'DejaVu Sans Mono', Menlo, Consolas, monospace" font-size="13" fill="#c2410c" font-weight="bold" text-anchor="middle">transformation</text>
+<text x="87.6" y="91" font-family="'Helvetica Neue', Arial, sans-serif" font-size="11" fill="#57606a" font-weight="normal" text-anchor="middle">part of the model</text>
+<path d="M155.8,50 L155.8,56 L363.8,56 L363.8,50" fill="none" stroke="#c2410c" stroke-width="1.5" stroke-linejoin="round"/>
+<text x="259.8" y="78" font-family="'Fira Code', 'DejaVu Sans Mono', Menlo, Consolas, monospace" font-size="13" fill="#c2410c" font-weight="bold" text-anchor="middle">specials</text>
+<text x="259.8" y="91" font-family="'Helvetica Neue', Arial, sans-serif" font-size="11" fill="#57606a" font-weight="normal" text-anchor="middle">model structure</text>
+<path d="M376.2,23 H399.2" stroke="#c2410c" stroke-width="1.5" fill="none"/>
+<circle cx="376.2" cy="23" r="2.5" fill="#c2410c"/>
+<text x="405.2" y="22" font-family="'Fira Code', 'DejaVu Sans Mono', Menlo, Consolas, monospace" font-size="13" fill="#c2410c" font-weight="bold" text-anchor="start">mdl_spec</text>
+<text x="405.2" y="35" font-family="'Helvetica Neue', Arial, sans-serif" font-size="11" fill="#57606a" font-weight="normal" text-anchor="start">model specification</text>
+<text x="12" y="27.4" font-family="'Fira Code', 'DejaVu Sans Mono', Menlo, Consolas, monospace" font-size="14" fill="#24292f" xml:space="preserve" style="white-space:pre" textLength="361.2" lengthAdjust="spacing"><tspan fill="#0969da">ETS</tspan><tspan>(</tspan><tspan fill="#0969da">log</tspan><tspan>(Trips) </tspan><tspan fill="#cf222e">~</tspan><tspan> </tspan><tspan fill="#0969da">trend</tspan><tspan>(</tspan><tspan fill="#116329">"Ad"</tspan><tspan>) </tspan><tspan fill="#cf222e">+</tspan><tspan> </tspan><tspan fill="#0969da">season</tspan><tspan>(</tspan><tspan fill="#116329">"M"</tspan><tspan>))</tspan></text>
+</svg>

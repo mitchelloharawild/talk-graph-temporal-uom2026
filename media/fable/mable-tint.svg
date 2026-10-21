@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-56 -12 772.04 250" width="772.04" height="250">
+<rect x="0" y="0" width="586.8" height="178" rx="6" fill="#f6f8fa" stroke="#d0d7de"/>
+<rect x="351.4" y="58" width="228.4" height="106" rx="4" fill="#c2410c" fill-opacity="0.08" stroke="#c2410c" stroke-opacity="0.6" stroke-dasharray="4 3"/>
+<text x="12" y="27.4" font-family="'Fira Code', 'DejaVu Sans Mono', Menlo, Consolas, monospace" font-size="14" fill="#24292f" xml:space="preserve" style="white-space:pre" textLength="134.4" lengthAdjust="spacing"><tspan fill="#949494"># A mable: 3 x 3</tspan></text>
+<text x="12" y="49.4" font-family="'Fira Code', 'DejaVu Sans Mono', Menlo, Consolas, monospace" font-size="14" fill="#24292f" xml:space="preserve" style="white-space:pre" textLength="168" lengthAdjust="spacing"><tspan fill="#949494"># Key:     State [3]</tspan></text>
+<text x="12" y="71.4" font-family="'Fira Code', 'DejaVu Sans Mono', Menlo, Consolas, monospace" font-size="14" fill="#24292f" xml:space="preserve" style="white-space:pre" textLength="562.8" lengthAdjust="spacing"><tspan>  State                            arima     ets$auto       $damped</tspan></text>
+<text x="12" y="93.4" font-family="'Fira Code', 'DejaVu Sans Mono', Menlo, Consolas, monospace" font-size="14" fill="#24292f" xml:space="preserve" style="white-space:pre" textLength="562.8" lengthAdjust="spacing"><tspan>  </tspan><tspan fill="#949494" font-style="italic">&lt;chr&gt;</tspan><tspan>                          </tspan><tspan fill="#949494" font-style="italic">&lt;model&gt;</tspan><tspan>      </tspan><tspan fill="#949494" font-style="italic">&lt;model&gt;</tspan><tspan>       </tspan><tspan fill="#949494" font-style="italic">&lt;model&gt;</tspan></text>
+<text x="12" y="115.4" font-family="'Fira Code', 'DejaVu Sans Mono', Menlo, Consolas, monospace" font-size="14" fill="#24292f" xml:space="preserve" style="white-space:pre" textLength="562.8" lengthAdjust="spacing"><tspan fill="#BCBCBC">1</tspan><tspan> NSW           &lt;ARIMA(0,1,1)(0,1,1)[4]&gt; &lt;ETS(M,N,A)&gt; &lt;ETS(A,Ad,A)&gt;</tspan></text>
+<text x="12" y="137.4" font-family="'Fira Code', 'DejaVu Sans Mono', Menlo, Consolas, monospace" font-size="14" fill="#24292f" xml:space="preserve" style="white-space:pre" textLength="562.8" lengthAdjust="spacing"><tspan fill="#BCBCBC">2</tspan><tspan> QLD   &lt;ARIMA(0,0,0)(1,0,0)[4] w/ mean&gt; &lt;ETS(A,N,A)&gt; &lt;ETS(A,Ad,A)&gt;</tspan></text>
+<text x="12" y="159.4" font-family="'Fira Code', 'DejaVu Sans Mono', Menlo, Consolas, monospace" font-size="14" fill="#24292f" xml:space="preserve" style="white-space:pre" textLength="562.8" lengthAdjust="spacing"><tspan fill="#BCBCBC">3</tspan><tspan> VIC           &lt;ARIMA(0,1,1)(0,1,1)[4]&gt; &lt;ETS(M,A,M)&gt; &lt;ETS(M,Ad,M)&gt;</tspan></text>
+<path d="M-2,12 L-8,12 L-8,166 L-2,166" fill="none" stroke="#c2410c" stroke-width="1.5" stroke-linejoin="round"/>
+<g transform="rotate(-90 -34 89)">
+<text x="-34" y="89" font-family="'Fira Code', 'DejaVu Sans Mono', Menlo, Consolas, monospace" font-size="13" fill="#c2410c" font-weight="bold" text-anchor="middle">mbl_df</text>
+<text x="-34" y="102" font-family="'Helvetica Neue', Arial, sans-serif" font-size="11" fill="#57606a" font-weight="normal" text-anchor="middle">model table</text>
+</g>
+<path d="M30.8,182 L30.8,188 L68.8,188 L68.8,182" fill="none" stroke="#c2410c" stroke-width="1.5" stroke-linejoin="round"/>
+<text x="49.8" y="210" font-family="'Fira Code', 'DejaVu Sans Mono', Menlo, Consolas, monospace" font-size="13" fill="#c2410c" font-weight="bold" text-anchor="middle">key</text>
+<text x="49.8" y="223" font-family="'Helvetica Neue', Arial, sans-serif" font-size="11" fill="#57606a" font-weight="normal" text-anchor="middle">series id</text>
+<path d="M81.2,182 L81.2,188 L346,188 L346,182" fill="none" stroke="#c2410c" stroke-width="1.5" stroke-linejoin="round"/>
+<text x="213.6" y="210" font-family="'Fira Code', 'DejaVu Sans Mono', Menlo, Consolas, monospace" font-size="13" fill="#c2410c" font-weight="bold" text-anchor="middle">mdl_lst</text>
+<text x="213.6" y="223" font-family="'Helvetica Neue', Arial, sans-serif" font-size="11" fill="#57606a" font-weight="normal" text-anchor="middle">model list</text>
+<path d="M358.4,182 L358.4,188 L572.8,188 L572.8,182" fill="none" stroke="#c2410c" stroke-width="1.5" stroke-linejoin="round" stroke-dasharray="4 3"/>
+<text x="465.6" y="210" font-family="'Fira Code', 'DejaVu Sans Mono', Menlo, Consolas, monospace" font-size="13" fill="#c2410c" font-weight="bold" text-anchor="middle">mdl_df</text>
+<text x="465.6" y="223" font-family="'Helvetica Neue', Arial, sans-serif" font-size="11" fill="#57606a" font-weight="normal" text-anchor="middle">model data frame</text>
+<rect x="462.6" y="101" width="115.2" height="20" rx="3" fill="none" stroke="#c2410c" stroke-width="1.5"/>
+<path d="M577.8,111 H600.8" stroke="#c2410c" stroke-width="1.5" fill="none"/>
+<circle cx="577.8" cy="111" r="2.5" fill="#c2410c"/>
+<text x="606.8" y="110" font-family="'Fira Code', 'DejaVu Sans Mono', Menlo, Consolas, monospace" font-size="13" fill="#c2410c" font-weight="bold" text-anchor="start">mdl_ts</text>
+<text x="606.8" y="123" font-family="'Helvetica Neue', Arial, sans-serif" font-size="11" fill="#57606a" font-weight="normal" text-anchor="start">time series model</text>
+</svg>

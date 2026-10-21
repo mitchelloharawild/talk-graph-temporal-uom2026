@@ -1,8 +1,9 @@
 ---
 from: markdown+emoji
-execute: 
-  cache: true
-format: 
+execute:
+  # htmlwidget ids collide across cached and re-run chunks, so only the data is cached
+  cache: false
+format:
   letterbox-revealjs:
     theme: custom.scss
     progress: false
@@ -12,11 +13,163 @@ format:
 filters:
   - custom-callouts
 callout-appearance: simple
+bibliography: citations.bib
 ---
 
 ```{r}
 #| label: setup
 #| include: false
+library(tidyverse)
+library(visNetwork)
+library(tidygraph)
+library(gt)
+# Development versions of the tidyverts packages (see renv.lock)
+library(tsibble)
+library(fable)
+library(ggtime)
+# Prototype graph pruning, from mitchelloharawild/paper-graph-pruning
+source("R/prune.R")
+options(width = 75)
+
+# Node colours by depth, shared by every graph in the talk
+level_colours <- c("grey70", "#084887", "#8093f1", "#fbb13c", "#B388EB")
+# Depth of each node from its nearest root, so disjoint graphs are coloured per component
+graph_level <- function(data) {
+  roots <- which(igraph::degree(data, mode = "in") == 0)
+  apply(igraph::distances(data, v = roots, mode = "out"), 2, min)
+}
+colour_by_level <- function(nodes) {
+  if (!"color" %in% names(nodes)) nodes$color <- level_colours[pmin(nodes$level, length(level_colours) - 1) + 1]
+  nodes
+}
+
+visnetwork_hierarchy <- function(data, ...) {
+  nodes <- as_tibble(mutate(activate(data, "nodes"), id = row_number(), level = graph_level(data))) |>
+    colour_by_level()
+  edges <- as_tibble(activate(data, "edges"))
+  graph <- visNetwork(nodes, edges, ...) |>
+    visHierarchicalLayout(direction = "UD", shakeTowards = "leaves") |>
+    visOptions(
+      highlightNearest = list(enabled = TRUE, degree = list(from = 50000, to = 0), hover = FALSE, algorithm = "hierarchical"),
+      collapse = list(enabled = TRUE, fit = FALSE, resetHighlight = TRUE, keepCoord = TRUE,
+                      clusterOptions = list(fixed = TRUE, physics = TRUE))
+    ) |>
+    visEdges(scaling = list(label = list(enabled = FALSE)), arrows = "to") |>
+    visNodes(font = list(size = 16))
+
+  graph$x$tree <- list(updateShape = TRUE, shapeVar = "dot", shapeY = "square")
+  graph
+}
+visnetwork_graph <- function(data, layout = "layout_nicely", ..., layout_args = list()) {
+  nodes <- as_tibble(mutate(activate(data, "nodes"), id = row_number(), level = graph_level(data))) |>
+    colour_by_level() |>
+    select(-level)
+  edges <- as_tibble(activate(data, "edges"))
+  graph <- visNetwork(nodes, edges, ...) |>
+    (\(g) exec(visIgraphLayout, g, layout = layout, randomSeed = 123091238, !!!layout_args))() |>
+    visOptions(
+      highlightNearest = list(enabled = TRUE, degree = list(from = 50000, to = 0), hover = FALSE)
+    ) |>
+    visEdges(width = 3, scaling = list(label = list(enabled = FALSE)), arrows = "to") |>
+    visNodes(size = 20)
+
+  graph$x$tree <- list(updateShape = TRUE, shapeVar = "dot", shapeY = "square")
+  graph
+}
+```
+
+```{r}
+#| label: data
+#| include: false
+#| cache: true
+fpp3_complete_ts <- readr::read_csv("fpp3_complete_raw.csv") |>
+  rename(screenPageViews = pageviews, activeUsers = users) |>
+  # Fill all structurally valid interactions to complete the bottom level series
+  complete(date, deviceCategory, nesting(continent, subContinent, country), fill = list(screenPageViews = 0, activeUsers = 0)) |>
+  group_by(date, deviceCategory, continent, subContinent, country) |>
+  summarise(
+    screenPageViews = sum(screenPageViews),
+    activeUsers = sum(activeUsers),
+    .groups = "drop"
+  ) |>
+  as_tsibble(index = date, key = c(deviceCategory, continent, subContinent, country)) |>
+  fill_gaps(screenPageViews = 0, activeUsers = 0, .full = TRUE)
+fpp3_complete_agg_ts <- fpp3_complete_ts |>
+  aggregate_key(
+    deviceCategory*(continent/subContinent/country),
+    screenPageViews = sum(screenPageViews),
+    activeUsers = sum(activeUsers)
+  )
+fpp3_pruned_ts <- fpp3_complete_ts |>
+  prune_aggregates(
+    deviceCategory * (continent / subContinent / country),
+    .predicate = mean(activeUsers) > 10 & mean(activeUsers == 0) < 0.5,
+    .keep = \(x) mean(x) > 0.5,
+    activeUsers = sum(activeUsers)
+  )
+rm(fpp3_complete_ts)
+
+# Series shown when traversing the graph, one disaggregation at a time
+fpp3_level <- function(l, .country = "France") {
+  switch(l,
+    Total = fpp3_complete_agg_ts |>
+      filter(if_all(c(deviceCategory, continent, subContinent, country), is_aggregated)),
+    continent = fpp3_complete_agg_ts |>
+      filter(!is_aggregated(continent), if_all(c(deviceCategory, subContinent, country), is_aggregated)),
+    subContinent = fpp3_complete_agg_ts |>
+      filter(continent == "Europe", !is_aggregated(subContinent), if_all(c(deviceCategory, country), is_aggregated)),
+    country = fpp3_complete_agg_ts |>
+      filter(subContinent == "Western Europe", !is_aggregated(country), is_aggregated(deviceCategory)),
+    deviceCategory = fpp3_complete_agg_ts |>
+      filter(country == .country, !is_aggregated(deviceCategory))
+  )
+}
+fpp3_lvls <- c("Total", "continent", "subContinent", "country", "deviceCategory")
+fpp3_colours <- set_names(level_colours, fpp3_lvls)
+
+# Favorita results use their own colours, so they don't read as graph levels.
+# Forecasting stages share a colour wherever they appear (accuracy and compute plots)
+result_colours <- c(
+  "In-sample fit" = "grey60", "Base forecasts" = "#D55E00", "Bottom-up" = "#56B4E9", "MinT (WLS)" = "#009E73",
+  "Base forecasts (ETS)" = "#D55E00", "Sample paths" = "#E69F00", "Reconcile (MinT WLS)" = "#009E73",
+  "Pruning" = "grey20", "Coherency structure" = "grey50",
+  RMSSE = "#0072B2", sCRPS = "#CC79A7"
+)
+
+fpp3_plot <- function(k, .country = "France") {
+  facets <- intersect(c("continent", "subContinent", "country", "deviceCategory"), fpp3_lvls[seq_len(k)])
+  fpp3_level(fpp3_lvls[k], .country) |>
+    mutate(across(all_of(facets), as.character)) |>
+    ggplot(aes(x = date, y = activeUsers)) +
+    geom_line() +
+    facet_grid(if (length(facets)) vars(!!!syms(facets)) else vars("Total"), scales = "free_y") +
+    theme_minimal()
+}
+
+# The traversed graph, with labels optionally highlighted by an illustrative pruning predicate
+fpp3_graph <- function(k, highlight = NULL, .country = "France") {
+  lvls <- fpp3_lvls[seq_len(k)]
+  parents <- c(continent = "Total", subContinent = "Europe", country = "Western Europe", deviceCategory = .country)
+  labels <- map(lvls, function(l) {
+    if (l == "Total") return("Total")
+    as.character(unique(fpp3_level(l, .country)[[l]]))
+  })
+  nodes <- tibble(
+    label = unlist(labels),
+    color = rep(fpp3_colours[lvls], lengths(labels))
+  )
+  if (!is.null(highlight)) nodes$font.background <- highlight
+  edges <- map(seq_along(lvls)[-1], function(i) {
+    tibble(
+      from = match(parents[[lvls[i]]], nodes$label),
+      to = sum(lengths(labels)[seq_len(i - 1)]) + seq_along(labels[[i]])
+    )
+  }) |>
+    list_rbind()
+  if (!nrow(edges)) edges <- tibble(from = numeric(), to = numeric())
+  tidygraph::tbl_graph(nodes = nodes, edges = edges) |>
+    visnetwork_hierarchy(width = 480, height = 650)
+}
 ```
 
 ##
@@ -27,7 +180,7 @@ callout-appearance: simple
 ::: {.column width="60%"}
 
 ::: {.title data-id="title"}
-Graphs for forecasting  
+Graphs for forecasting
 many related time series
 :::
 
@@ -55,3 +208,2084 @@ Mitchell O'Hara-Wild, Monash University
 
 :::
 :::
+
+![](backgrounds/emma-gossett-B645igbiKCw-unsplash.jpg){.image-left}
+
+
+<!-- ====================================================================== -->
+<!-- Part 1: Software design for forecasting at scale                       -->
+<!-- ====================================================================== -->
+
+
+## {}
+
+::: columns
+::: {.column width="60%"}
+
+### Forecasting in practice
+
+Rarely just one time series.
+
+::: {.fragment .fade-up}
+::: {.callout-note}
+## Many related series
+
+Organisations forecast large collections of related series, e.g.
+
+* product sales across stores and regions
+* visitors by origin and purpose of travel
+* page views by country and device
+
+The M5 competition: 42,840 related retail series.
+:::
+:::
+
+::: {.fragment .fade-up}
+::: {.callout-question}
+## What does software for this look like?
+
+Many series and many models, through a single consistent interface.
+:::
+:::
+
+:::
+:::
+
+![](backgrounds/sander-weeteling-KABfjuSOx74-unsplash.jpg){.image-right}
+
+
+## {}
+
+### Forecasting is more than fitting a model
+
+![](media/fable/workflow.svg){fig-align="center" width="100%"}
+
+::: columns
+::: {.column width="33%"}
+::: {.fragment .fade-up}
+::: {.callout-note icon=false}
+## Consistent
+
+One interface for every model and every series.
+:::
+:::
+:::
+::: {.column width="33%"}
+::: {.fragment .fade-up}
+::: {.callout-note icon=false}
+## Extensible
+
+New models and methods slot into the same workflow.
+:::
+:::
+:::
+::: {.column width="33%"}
+::: {.fragment .fade-up}
+::: {.callout-note icon=false}
+## Probabilistic
+
+Forecast distributions to evaluate, combine and compare.
+:::
+:::
+:::
+:::
+
+
+## {.fragment-remove}
+
+::: columns
+::: {.column width="40%"}
+:::
+::: {.column width="60%"}
+
+### A tidy data model for time series
+
+The unit of analysis is the *collection*, not the individual series.
+
+::: {.fragment .fade-out fragment-index=1}
+![](media/fable/data-overview.svg){width="100%" fig-align="center"}
+:::
+
+::: {.fragment .fade-in-then-out fragment-index=1}
+::: {.callout-note icon=false}
+## tsibble
+
+Time **index**, **key** variables identify each series.
+:::
+
+![](media/fable/tsibble.svg){width="70%" fig-align="center"}
+:::
+
+::: {.fragment .fade-in-then-out fragment-index=2}
+::: {.callout-note icon=false}
+## mable
+
+One row per series, one column per model specification.
+:::
+
+![](media/fable/mable-tint.svg){width="100%" fig-align="center"}
+:::
+
+::: {.fragment .fade-in fragment-index=3}
+::: {.callout-note icon=false}
+## fable
+
+Forecasts for every series and model.
+:::
+
+![](media/fable/fable-table-hilo.svg){width="90%" fig-align="center"}
+:::
+
+:::
+:::
+
+![](backgrounds/yoksel-zok-aEMEMsBNqeo-unsplash.jpg){.image-left}
+
+
+## {auto-animate=true}
+
+::: columns
+::: {.column width="40%"}
+:::
+::: {.column width="60%"}
+
+### Forecasting many related series
+
+```{r}
+options(width = 60, pillar.print_max = 5, pillar.print_min = 5)
+```
+
+```{r}
+#| echo: true
+tourism_agg <- tourism |>
+  aggregate_key(Purpose * State, Trips = sum(Trips))
+tourism_agg
+```
+
+:::
+:::
+
+![](backgrounds/sander-weeteling-KABfjuSOx74-unsplash.jpg){.image-left}
+
+
+## {auto-animate=true}
+
+::: columns
+::: {.column width="40%"}
+:::
+::: {.column width="60%"}
+
+### Forecasting many related series
+
+```{r}
+#| echo: true
+fit <- tourism_agg |>
+  filter_index(~ "2015 Q4") |>
+  model(ets = ETS(Trips)) |>
+  mutate(mint = reconcile_mint(ets))
+fit
+```
+
+::: {.fragment .fade-up}
+One row per series, one column per model.
+
+`reconcile_mint()` makes the forecasts coherent (more on this soon).
+:::
+
+:::
+:::
+
+![](backgrounds/sander-weeteling-KABfjuSOx74-unsplash.jpg){.image-left}
+
+
+## {auto-animate=true}
+
+::: columns
+::: {.column width="40%"}
+:::
+::: {.column width="60%"}
+
+### Forecasting many related series
+
+```{r}
+#| echo: true
+#| fig-height: 2.8
+#| fig-width: 7
+fc <- fit |> forecast(h = "2 years")
+fc |>
+  filter(is_aggregated(Purpose), is_aggregated(State)) |>
+  autoplot(tourism_agg |> filter_index("2010 Q1" ~ .), level = 95)
+```
+
+```{r}
+#| echo: true
+accuracy(fc, tourism_agg) |>
+  summarise(RMSSE = mean(RMSSE), .by = .model) |>
+  as.data.frame()
+```
+
+:::
+:::
+
+![](backgrounds/sander-weeteling-KABfjuSOx74-unsplash.jpg){.image-left}
+
+
+## {.fragment-remove}
+
+::: columns
+::: {.column width="60%"}
+
+### The structure lives in the key
+
+`aggregate_key()` produces every implied aggregate.
+
+::: {.fragment .fade-out fragment-index=1}
+```{r}
+#| echo: true
+class(tourism_agg$State)
+```
+:::
+
+::: {.fragment .fade-up fragment-index=1}
+Keys are vectors of nodes in a graph.
+:::
+
+::: {.fragment .fade-in-then-out fragment-index=1}
+```{r}
+#| echo: true
+keys <- distinct(tourism_agg, Purpose, State)
+graphvec::edges(
+  graphvec::agg_df(
+    Purpose = keys$Purpose, State = keys$State
+  )
+) |>
+  head(5)
+```
+:::
+
+::: {.fragment .fade-up fragment-index=2}
+::: {.callout-question}
+## Why did reconciliation improve accuracy?
+
+And how should we represent these relationships, especially as collections become large and irregular?
+:::
+:::
+
+:::
+:::
+
+![](backgrounds/sander-weeteling-KABfjuSOx74-unsplash.jpg){.image-right}
+
+
+<!-- ====================================================================== -->
+<!-- Part 2: Reconciliation with graphs                                     -->
+<!-- ====================================================================== -->
+
+
+## {}
+
+::: columns
+::: {.column width="60%"}
+
+### The basics of reconciliation
+
+::: {.callout-question}
+
+## How many tourists will visit Melbourne?
+
+::: {.fragment .fade-in}
+Forecast $\text{Visitors}_{T+h|T}$ with a suitable model and data.
+:::
+
+:::
+
+::: {.fragment .fade-in}
+::: {.callout-question}
+## How many visitors are from Australia and overseas?
+
+::: {.fragment .fade-in}
+Forecast $\text{Interstate}_{T+h|T}$ and $\text{International}_{T+h|T}$ with
+
+suitable models and data.
+:::
+:::
+:::
+
+::: {.fragment .fade-in}
+::: {.callout-important}
+## Something doesn't add up here...
+
+Independently produced forecasts are [**incoherent**]{.danger},
+
+$\text{Visitors}_{T+h|T} \neq \text{Interstate}_{T+h|T} + \text{International}_{T+h|T}$.
+:::
+:::
+
+:::
+:::
+
+![](backgrounds/linda-xu-K9NhnXS15ZY-unsplash.jpg){.image-right}
+
+
+## {}
+
+::: columns
+::: {.column width="60%"}
+
+### The basics of reconciliation
+
+::: {.callout-tip}
+
+## Impose constraints to ensure coherency
+
+Adjust the forecasts to satisfy
+
+$\text{Visitors}_{T+h|T} = \text{Interstate}_{T+h|T} + \text{International}_{T+h|T}$
+
+:::
+
+::: {.fragment .fade-in}
+
+::: {.callout-note}
+## Structural representation
+
+$$
+\begin{bmatrix}
+  \text{Visitors}_{t} \\
+  \text{Interstate}_{t} \\
+  \text{International}_{t} \\
+\end{bmatrix}
+=
+\begin{bmatrix}
+  1 & 1 \\
+  1 & 0\\
+  0 & 1 \\
+\end{bmatrix}
+\begin{bmatrix}
+  \text{Interstate}_{t} \\
+  \text{International}_{t} \\
+\end{bmatrix}
+$$
+
+or compactly, $\mathbf{y}_t = \mathbf{S} \mathbf{b}_t$
+
+:::
+:::
+
+::: {.fragment .fade-in}
+::: {.callout-paper}
+Summing matrices are described in @hyndman2011.
+:::
+:::
+
+:::
+:::
+
+![](backgrounds/linda-xu-K9NhnXS15ZY-unsplash.jpg){.image-right}
+
+
+## {}
+
+::: columns
+::: {.column width="60%"}
+
+### The basics of reconciliation
+
+::: {.callout-note}
+
+## Reconciling forecasts
+
+The L2 optimal adjustment is MinT [@Wickramasuriya2018OptimalFR]:
+
+$$
+  \tilde{\mathbf{y}}_{T+h|T}=\mathbf{S}(\mathbf{S}'\mathbf{W}_{h}^{-1}\mathbf{S})^{-1}\mathbf{S}'\mathbf{W}_{h}^{-1}\hat{\mathbf{y}}_{T+h|T}
+$$
+
+where $\mathbf{W}_{h}=\text{Var}[\mathbf{y}_{T+h}-\hat{\mathbf{y}}_{T+h|T}]$.
+
+:::
+
+::: {.fragment .fade-in}
+::: {.callout-tip}
+## Coherent forecasts are more accurate
+
+Not only more reasonable: information is shared between series.
+:::
+:::
+
+::: {.fragment .fade-in}
+These matrices quickly become unreadable for large collections.
+
+Let's instead consider **graphs**.
+:::
+
+:::
+:::
+
+![](backgrounds/linda-xu-K9NhnXS15ZY-unsplash.jpg){.image-right}
+
+
+## {}
+
+::: columns
+::: {.column width="40%"}
+:::
+::: {.column width="60%"}
+### Hierarchical coherence
+
+::: {.callout-note}
+## Each aggregate has a single constraint
+
+The basic constraint is [**hierarchical**]{.term}
+
+```{r}
+tidygraph::tbl_graph(
+  nodes = tibble(label = c("Visitors", "Interstate", "International")),
+  edges = tibble(from = c(1, 1), to = c(2, 3))
+) |>
+  visnetwork_hierarchy(width = 600, height = 250)
+```
+
+The edges correspond to the $\mathbf{S}$ matrix.
+:::
+
+:::
+:::
+
+![](backgrounds/PXL_20230626_200731948.jpg){.image-left}
+
+
+## {}
+
+::: columns
+::: {.column width="40%"}
+:::
+::: {.column width="60%"}
+### Hierarchical coherence
+
+::: {.callout-note}
+## Each aggregate has a single constraint
+
+[**Hierarchical**]{.term} series often have multiple layers
+
+```{r}
+tidygraph::tbl_graph(
+  nodes = tibble(label = c("Visitors", "Interstate", "International", "NSW", "QLD", "Other states")),
+  edges = tibble(from = c(1, 1, 2, 2, 2), to = c(2, 3, 4, 5, 6))
+) |>
+  visnetwork_hierarchy(width = 600, height = 400)
+```
+
+::: {.fragment .fade-in}
+In graph terms, this is a [**polytree**]{.term}.
+:::
+:::
+
+:::
+:::
+
+![](backgrounds/PXL_20230626_200731948.jpg){.image-left}
+
+
+## {}
+
+::: columns
+::: {.column width="60%"}
+### Grouped coherence
+
+There are many ways to disaggregate a series.
+
+Consider why visitors travel, for a **holiday** or **business**?
+
+::: {.fragment .fade-in}
+```{r}
+tidygraph::tbl_graph(
+  nodes = tibble(label = c("Visitors", "Holiday", "Business")),
+  edges = tibble(from = c(1, 1), to = c(2, 3))
+) |>
+  visnetwork_hierarchy(width = 600, height = 250)
+```
+:::
+
+::: {.fragment .fade-in}
+::: {.callout-question}
+## What about where visitors are from?
+
+Let's consider the combinations.
+:::
+:::
+
+:::
+:::
+
+![](backgrounds/zach-callahan--i51Ke0ROTo-unsplash.jpg){.image-right}
+
+
+## {}
+
+::: columns
+::: {.column width="60%"}
+### Grouped coherence
+
+::: {.callout-note}
+## Considering origin and purpose
+
+Disaggregate by one, then further by the other.
+
+::: columns
+::: {.column width="50%"}
+```{r}
+tidygraph::tbl_graph(
+  nodes = tibble(label = c("Visitors", "Interstate", "International", "Interstate\n& Holiday", "Interstate\n& Business", "International\n& Holiday", "International\n& Business")),
+  edges = tibble(from = c(1, 1, 2, 2, 3, 3), to = c(2, 3, 4, 5, 6, 7))
+) |>
+  visnetwork_hierarchy(width = 300, height = 400)
+```
+:::
+::: {.column width="50%"}
+```{r}
+tidygraph::tbl_graph(
+  nodes = tibble(label = c("Visitors", "Holiday", "Business", "Holiday\n& Interstate", "Holiday\n& International", "Business\n& Interstate", "Business\n& International")),
+  edges = tibble(from = c(1, 1, 2, 2, 3, 3), to = c(2, 3, 4, 5, 6, 7))
+) |>
+  visnetwork_hierarchy(width = 300, height = 400)
+```
+:::
+:::
+
+A [**grouped**]{.term} structure has the same top and bottom series.
+
+:::
+:::
+:::
+
+![](backgrounds/zach-callahan--i51Ke0ROTo-unsplash.jpg){.image-right}
+
+
+## {}
+
+::: columns
+::: {.column width="60%"}
+### Grouped coherence
+
+::: {.callout-note}
+## Considering origin and purpose
+
+The [**grouped**]{.term} structure can be drawn as a single graph.
+
+```{r}
+tidygraph::tbl_graph(
+  nodes = tibble(label = c("Visitors", "Interstate", "International", "Holiday", "Business", "Interstate\n& Holiday", "Interstate\n& Business", "International\n& Holiday", "International\n& Business")),
+  edges = tibble(
+    from  = c(1, 1, 1, 1, 2, 4, 2, 5, 3, 4, 3, 5),
+    to    = c(2, 3, 4, 5, 6, 6, 7, 7, 8, 8, 9, 9),
+    color = hcl.colors(3, "Dark2")[c(1,1,2,2,1,2,1,2,1,2,1,2)]
+  )
+) |>
+  visnetwork_graph(width = 600, height = 400)
+```
+
+::: {.fragment .fade-in}
+In graph terms, this is a [**directed acyclic graph**]{.term} (DAG).
+:::
+:::
+
+:::
+:::
+
+![](backgrounds/zach-callahan--i51Ke0ROTo-unsplash.jpg){.image-right}
+
+
+## {}
+
+::: columns
+::: {.column width="40%"}
+:::
+::: {.column width="60%"}
+### Temporal coherence
+
+::: {.callout-note}
+A time series can be disaggregated by temporal granularity
+
+```{r}
+tidygraph::tbl_graph(
+  nodes = tibble(label = c("Year", "Q1", "Q2", "Q3", "Q4", month.abb)),
+  edges = tibble(from = c(rep(1, 4), rep(2:5, each = 3)), to = c(2:17))
+) |>
+  visnetwork_hierarchy(width = 700, height = 200) |>
+  visNodes(font = list(size = 40))
+```
+:::
+
+::: {.callout-paper}
+Temporal reconciliation is described in @ATHANASOPOULOS201760.
+:::
+
+::: {.fragment .fade-in}
+::: {.callout-question}
+## What type of coherence structure is this?
+
+::: {.fragment .fade-in}
+A [**polytree**]{.term}, so this structure is [**hierarchical**]{.term}...
+:::
+:::
+:::
+:::
+:::
+
+![](backgrounds/courtney-smith-pCLKkPHpCz0-unsplash.jpg){.image-left}
+
+
+## {}
+
+::: columns
+::: {.column width="40%"}
+:::
+::: {.column width="60%"}
+### Temporal coherence
+
+```{r}
+tidygraph::tbl_graph(
+  nodes = tibble(label = c("Year", "Q1", "Q2", "Q3", "Q4", month.abb)),
+  edges = tibble(from = c(rep(1, 4), rep(2:5, each = 3)), to = c(2:17))
+) |>
+  visnetwork_hierarchy(width = 700, height = 200) |>
+  visNodes(font = list(size = 40))
+```
+
+```{r}
+tidygraph::tbl_graph(
+  nodes = tibble(label = c("Year", "Jan-Apr", "May-Aug", "Sep-Dec", month.abb)),
+  edges = tibble(from = c(rep(1, 3), rep(2:4, each = 4)), to = c(2:16))
+) |>
+  visnetwork_hierarchy(width = 700, height = 200) |>
+  visNodes(font = list(size = 40))
+```
+
+::: {.fragment .fade-in}
+::: {.callout-question}
+## ...or is it?
+::: {.fragment .fade-in}
+Same top and bottom series, so temporal coherence is [**grouped**]{.term}.
+:::
+:::
+:::
+:::
+:::
+
+![](backgrounds/courtney-smith-pCLKkPHpCz0-unsplash.jpg){.image-left}
+
+
+## {}
+
+::: columns
+::: {.column width="40%"}
+:::
+::: {.column width="60%"}
+### Temporal coherence
+
+::: {.callout-tip}
+## Temporal coherence is a DAG
+
+```{r}
+tidygraph::tbl_graph(
+  nodes = tibble(label = c("Year", "Q1", "Q2", "Q3", "Q4", "Jan-Apr", "May-Aug", "Sep-Dec", month.abb)),
+  edges = tibble(
+    from = c(rep(1, 7), rep(2:5, each = 3), rep(6:8, each = 4)),
+    to = c(2:8, 9:20, 9:20),
+    grp = c(rep(1, 4), rep(2, 3), rep(1, 12), rep(2, 12)),
+    color = hcl.colors(3, "Dark2")[grp]
+  )
+) |>
+  visnetwork_graph(width = 700, height = 450) |>
+  visNodes(font = list(size = 30))
+```
+:::
+
+::: {.fragment .fade-in}
+Cross-sectional and temporal DAGs combine into a single [**cross-temporal**]{.term} DAG.
+:::
+
+:::
+:::
+
+![](backgrounds/courtney-smith-pCLKkPHpCz0-unsplash.jpg){.image-left}
+
+
+## {}
+
+::: columns
+::: {.column width="40%"}
+:::
+::: {.column width="60%"}
+
+### Temporal coherence in software
+
+Time is a dimension of disaggregation too.
+
+Melbourne pedestrians, by day, month and year:
+
+```{r}
+#| echo: true
+#| R.options: !expr list(pillar.print_min = 3, pillar.print_max = 3)
+pedestrian |>
+  filter(Sensor == "Southern Cross Station") |>
+  select(-Sensor) |>
+  aggregate_index(
+    list(day(1L), month(1L), year(1L)),
+    Count = sum(Count)
+  )
+```
+
+::: {.fragment .fade-up}
+::: {.callout-tip}
+## Mixed granularities with mixtime
+
+Temporal aggregates are keyed by their `.granule`.
+:::
+:::
+
+:::
+:::
+
+![](backgrounds/courtney-smith-pCLKkPHpCz0-unsplash.jpg){.image-left}
+
+
+## {}
+
+::: columns
+::: {.column width="60%"}
+### Graph coherence
+
+A [**DAG**]{.term} does **not** require a common top or bottom series.
+
+::: {.fragment .fade-in}
+::: {.callout-question}
+## Is the full generality of DAGs useful?
+
+::: {.fragment .fade-in}
+Yes! Graphs describe structures that hierarchical and grouped coherence cannot:
+
+* unbalanced graphs (different bottom series)
+* disjoint graphs (different top series)
+:::
+:::
+:::
+
+::: {.fragment .fade-in}
+::: {.callout-paper}
+Equivalent to linearly constrained time series [@girolimetto2023point], but far easier to read and manipulate.
+:::
+:::
+
+:::
+:::
+
+![](backgrounds/eilis-garvey-MskbR8VLNrA-unsplash.jpg){.image-right}
+
+
+## {auto-animate=true}
+
+::: columns
+::: {.column width="40%"}
+:::
+::: {.column width="60%"}
+### Unbalanced graphs
+
+What if the bottom series differ?
+
+This often occurs with:
+
+1. series observed at **different temporal granularities**
+2. **different approaches** to calculating the top series
+
+:::
+:::
+
+![](backgrounds/peter-law-2fU_lyraUOA-unsplash.jpg){.image-left}
+
+
+## {auto-animate=true}
+
+::: columns
+::: {.column width="40%"}
+:::
+::: {.column width="60%"}
+
+### Unbalanced graphs
+
+1. Series observed at **different temporal granularities**
+
+::: {.callout-tip}
+## Example
+`Sales` is reported quarterly, but `Profit` and `Costs` twice yearly.
+
+:::{data-id="graphtemp"}
+```{r}
+tidygraph::tbl_graph(
+  nodes = tibble(label = c("Profit (Y)", "Sales (Y)", "-Costs (Y)", "Profit (S1)", "Sales (S1)", "-Costs (S1)", "Profit (S2)", "Sales (S2)", "-Costs (S2)", "Sales (Q1)","Sales (Q2)","Sales (Q3)","Sales (Q4)")),
+  edges = tibble(
+    from  = c(1, 1, 4, 4, 7, 7,    1, 1, 2, 2, 3, 3,   5, 5, 8, 8),
+    to    = c(2, 3, 5, 6, 8, 9,    4, 7, 5, 8, 6, 9,   10, 11, 12, 13),
+    grp   = c(1, 1, 1, 1, 1, 1,    2, 2, 2, 2, 2, 2,   3,  3,  3,  3),
+    color = hcl.colors(3, "Dark2")[grp]
+  )
+) |>
+  visnetwork_graph(width = 600, height = 300) |>
+  visNodes(font = list(size = 25))
+```
+:::
+
+::: {.fragment .fade-in}
+Higher frequency `Sales` data informs the less frequent `Profit` and `Costs`.
+:::
+:::
+:::
+:::
+
+![](backgrounds/peter-law-2fU_lyraUOA-unsplash.jpg){.image-left}
+
+
+## {}
+
+::: columns
+::: {.column width="40%"}
+:::
+::: {.column width="60%"}
+
+### Unbalanced graphs
+
+2. **Different approaches** to calculating the top series
+
+::: {.callout-tip}
+## Example
+
+Australian GDP is calculated with 3 approaches:
+
+* Income approach (I)
+* Expenditure approach (E)
+* Production approach (P)
+
+For simplicity consider a small part of these graphs.
+:::
+
+::: {.callout-paper}
+This example is used in @Athanasopoulos2020.
+:::
+
+:::
+:::
+
+![](backgrounds/peter-law-2fU_lyraUOA-unsplash.jpg){.image-left}
+
+
+## {}
+
+::: columns
+::: {.column width="40%"}
+:::
+::: {.column width="60%"}
+
+### Unbalanced graphs
+
+2. **Different approaches** to calculating the top series
+
+::: {.callout-tip}
+
+* Income approach (I)
+
+```{r}
+aus_gdp_struct <- tribble(
+  ~ code, ~ parent,
+  "GDP", NA,
+  c("Statistical\nDiscrepancy (I)", "Income", "Taxes"), "GDP"
+) |>
+  tidyr::unchop(code)
+tidygraph::tbl_graph(
+  nodes = aus_gdp_struct |>
+    transmute(label = code),
+  edges = aus_gdp_struct |>
+    mutate(across(everything(), ~ match(., code))) |>
+    filter(!is.na(parent)) |>
+    rename(from = parent, to = code)
+) |>
+  visnetwork_hierarchy(width = 600, height = 200)
+```
+
+* Expenditure approach (E)
+
+```{r}
+aus_gdp_struct <- tribble(
+  ~ code, ~ parent,
+  "GDP", NA,
+  c("Statistical\nDiscrepancy (E)", "-Imports", "Exports", "Expenses"), "GDP"
+) |>
+  tidyr::unchop(code)
+tidygraph::tbl_graph(
+  nodes = aus_gdp_struct |>
+    transmute(label = code),
+  edges = aus_gdp_struct |>
+    mutate(across(everything(), ~ match(., code))) |>
+    filter(!is.na(parent)) |>
+    rename(from = parent, to = code)
+) |>
+  visnetwork_hierarchy(width = 600, height = 200)
+```
+
+:::
+:::
+:::
+
+![](backgrounds/peter-law-2fU_lyraUOA-unsplash.jpg){.image-left}
+
+
+## {}
+
+::: columns
+::: {.column width="40%"}
+:::
+::: {.column width="60%"}
+
+### Unbalanced graphs
+
+2. **Different approaches** to calculating the top series
+
+::: {.callout-tip}
+
+* Combined approach (I & E)
+
+```{r}
+aus_gdp_struct <- tribble(
+  ~ code, ~ parent,
+  "GDP", NA,
+  c("Statistical\nDiscrepancy (I)", "Income", "Taxes", "Statistical\nDiscrepancy (E)", "-Imports", "Exports", "Expenses"), "GDP"
+) |>
+  tidyr::unchop(code)
+tidygraph::tbl_graph(
+  nodes = aus_gdp_struct |>
+    transmute(label = code),
+  edges = aus_gdp_struct |>
+    mutate(across(everything(), ~ match(., code))) |>
+    filter(!is.na(parent)) |>
+    rename(from = parent, to = code) |>
+    mutate(color = hcl.colors(3, "Dark2")[c(rep(1, 3), rep(2, 4))])
+) |>
+  visnetwork_graph(layout = "layout_as_tree", layout_args = list(root = 1, flip.y = FALSE), width = 650, height = 330)
+```
+
+Two constraints on GDP, with no common bottom series.
+:::
+:::
+:::
+
+![](backgrounds/peter-law-2fU_lyraUOA-unsplash.jpg){.image-left}
+
+
+## {}
+
+::: columns
+::: {.column width="60%"}
+### Disjoint graphs
+
+What if there are **multiple top series**?
+
+::: {.fragment .fade-in}
+This occurs with:
+
+1. cross-validation with reconciliation
+2. partial coherency (e.g. no worldwide total)
+:::
+
+::: {.fragment .fade-in}
+::: {.callout-tip}
+## Cross-validation
+
+It makes no sense to aggregate folds of cross-validation.
+
+```{r}
+tidygraph::tbl_graph(
+  nodes = tibble(label = paste0(c("Visitors", "Interstate", "International"), "\n(fold ", rep(1:3, each = 3), ")")),
+  edges = tibble(from = c(1, 1, 4, 4, 7, 7), to = c(2, 3, 5, 6, 8, 9))
+) |>
+  visnetwork_graph(width = 600, height = 170)
+```
+
+Each disjoint graph is reconciled separately.
+:::
+:::
+
+:::
+:::
+
+![](backgrounds/firosnv-photography-Rr3B0LH7W3k-unsplash.jpg){.image-right}
+
+
+## {}
+
+::: columns
+::: {.column width="60%"}
+### Reconciliation on graphs
+
+::: {.callout-note}
+## Each disaggregation is a constraint
+
+Every parent and set of children gives a row of $\mathbf{C}$,
+
+$$
+y_{\text{parent},t} - \sum_{j \in \text{children}} y_{j,t} = 0
+\quad\Rightarrow\quad
+\mathbf{C}\mathbf{y}_t = \mathbf{0}.
+$$
+:::
+
+::: {.fragment .fade-in}
+::: {.callout-tip}
+## Reconcile by projection
+
+No top or bottom series needed:
+
+$$
+\tilde{\mathbf{y}}_{T+h|T} = \left(\mathbf{I} - \mathbf{W}_h\mathbf{C}'(\mathbf{C}\mathbf{W}_h\mathbf{C}')^{+}\mathbf{C}\right)\hat{\mathbf{y}}_{T+h|T}
+$$
+
+Redundant constraints are handled by the generalised inverse.
+
+Equivalent to MinT when the graph is hierarchical or grouped.
+:::
+:::
+
+:::
+:::
+
+![](backgrounds/eilis-garvey-MskbR8VLNrA-unsplash.jpg){.image-right}
+
+
+## {.fragment-remove}
+
+::: columns
+::: {.column width="40%"}
+:::
+::: {.column width="60%"}
+### Exploring data with graphs
+
+Graphs give us a vocabulary for navigating structured time series.
+
+::: {.fragment .fade-out fragment-index=1}
+::: {.callout-note}
+## Australian tourism by state and region
+
+```{r}
+tourism_regions <- tourism |>
+  as_tibble() |>
+  distinct(State, Region)
+visNetwork(
+  nodes = tibble(
+    id = seq_len(1 + n_distinct(tourism_regions$State) + nrow(tourism_regions)),
+    label = c("Australia", unique(tourism_regions$State), tourism_regions$Region),
+    color = rep(level_colours[1:3], c(1, n_distinct(tourism_regions$State), nrow(tourism_regions)))
+  ),
+  edges = tibble(
+    from = c(rep(1, n_distinct(tourism_regions$State)), 1 + match(tourism_regions$State, unique(tourism_regions$State))),
+    to = 1 + seq_len(n_distinct(tourism_regions$State) + nrow(tourism_regions))
+  ),
+  width = 700, height = 420
+) |>
+  visIgraphLayout(layout = "layout_as_tree", circular = TRUE, root = 1) |>
+  visOptions(highlightNearest = list(enabled = TRUE, degree = list(from = 50000, to = 0), hover = FALSE)) |>
+  visNodes(size = 10, font = list(size = 14)) |>
+  visEdges(arrows = "to")
+```
+
+Click a node to highlight its descendants.
+:::
+:::
+
+::: {.fragment .fade-in fragment-index=1}
+::: {.callout-tip}
+## Graph vocabulary
+
+* parents, children, ancestors and descendants
+* depth, leaves and roots
+* subgraphs, paths and graph search
+:::
+:::
+
+:::
+:::
+
+![](backgrounds/aleksandar-radovanovic-mXKXJI98aTE-unsplash.jpg){.image-left}
+
+
+## {.fragment-remove}
+
+::: columns
+::: {.column width="60%"}
+### Recap
+
+::: {.callout-note}
+
+## Coherence and graph theory
+
+* [**Hierarchical**]{.term} coherence is a [**polytree**]{.term}.
+* [**Grouped**]{.term} coherence is a *restricted* [**DAG**]{.term}.
+* [**Graph**]{.term} coherence is an *unrestricted* [**DAG**]{.term}.
+
+:::
+
+::: {.fragment .fade-out fragment-index=1}
+![](resources/set.svg){fig-align="center"}
+:::
+
+::: {.fragment .fade-in fragment-index=1}
+::: {.callout-tip}
+## Graphs bring
+
+* efficient graph algorithms
+* visualisation of structured time series
+* a familiar grammar for coherent data
+:::
+:::
+
+:::
+:::
+
+![](backgrounds/meric-dagli-7NBO76G5JsE-unsplash.jpg){.image-right}
+
+
+<!-- ====================================================================== -->
+<!-- Part 3: Pruning graphs                                                 -->
+<!-- ====================================================================== -->
+
+```{r}
+#| label: dimensionality
+#| include: false
+# Illustrative supply chain dimensionality, from the tables in mitchelloharawild/paper-graph-pruning
+source("R/dimensionality.R")
+supply_chain_hierarchy <- tribble(
+  ~ Dimension, ~ `New series`,
+  "Global", 1,
+  "Continent", 7,
+  "Countries", 200,
+  "States/Provinces", 4000,
+  "Counties/Districts/Councils", 40000,
+  "Suburbs/Towns/Neighbourhoods", 200000
+) |>
+  mutate(`Total series` = cumsum(`New series`))
+supply_chain <- tribble(
+  ~ Dimension, ~ Levels, ~ l,
+  "Total", "", 0,
+  "Warehouse", "Apex, Titan, ...", 83,
+  "Packaging", "Letter, Pouch, Box, ...", 5,
+  "Weight", "Light, Medium, Heavy", 3,
+  "Size", "Small, Medium, Large", 3,
+  "Transport", "Air, Land, Sea", 3,
+  "Dangerous goods", "Explosive, Radioactive, ...", 9,
+  "Class", "Regular, Expedited, ...", 5,
+  "Payment type", "Credit, Cheque, Transfer, ...", 4,
+  "VMI type", "Basic, Collaborative, Advanced, ...", 4
+) |>
+  mutate(
+    `Total series` = vapply(seq_len(n()), \(x) total_grouped_series(l[seq_len(x)]), double(1L)),
+    `New series` = c(1, diff(`Total series`)),
+    `Pruned series` = vapply(seq_len(n()), \(x) total_grouped_series(l[seq_len(x)], depth = pmin(x, 3)), double(1L))
+  )
+
+# A table whose rows are revealed one at a time, for building up dimensionality
+fragment_table <- function(data) {
+  num <- vapply(data, is.numeric, logical(1L))
+  row <- function(values, tag, ...) {
+    cells <- Map(\(v, n) tag(if (is.numeric(v)) scales::comma(v) else v, class = if (n) "num"), values, num)
+    htmltools::tags$tr(..., unname(cells))
+  }
+  htmltools::tags$table(
+    class = "fragment-table",
+    htmltools::tags$thead(row(as.list(names(data)), htmltools::tags$th)),
+    htmltools::tags$tbody(lapply(seq_len(nrow(data)), \(i) {
+      row(as.list(data[i, ]), htmltools::tags$td, class = if (i > 1) "fragment")
+    }))
+  )
+}
+```
+
+<!-- ---------------------------------------------------------------------- -->
+<!-- Problem: the curse of dimensionality (illustrated, then fpp3)          -->
+<!-- ---------------------------------------------------------------------- -->
+
+
+## {}
+
+::: columns
+::: {.column width="60%"}
+
+### Breadth vs depth
+
+Each disaggregating dimension adds useful information.
+
+* improves forecast accuracy
+* supports decision-making
+
+::: {.fragment .fade-up}
+::: {.callout-caution}
+## The curse of dimensionality
+
+Grouped structures need every combination of every dimension.
+
+The number of series grows exponentially with each dimension.
+:::
+:::
+
+:::
+:::
+
+![](backgrounds/arno-senoner-ynvV5b4zZM0-unsplash.jpg){.image-right}
+
+
+## {}
+
+### Breadth vs depth
+
+Hierarchical: a global supply chain, disaggregated by location.
+
+```{r}
+supply_chain_hierarchy |>
+  relocate(`Total series`, .after = `New series`) |>
+  fragment_table()
+```
+
+::: {.fragment .fade-up}
+Grows exponentially with depth, at a rate set by the branching factor.
+:::
+
+
+## {}
+
+### Breadth vs depth
+
+Grouped: the same supply chain, crossed with every other dimension.
+
+```{r}
+supply_chain |>
+  select(Dimension, Levels, Count = l, `New series`, `Total series`) |>
+  fragment_table()
+```
+
+::: {.fragment .fade-up}
+Every combination of every dimension, so it grows even faster.
+:::
+
+
+## {}
+
+::: columns
+::: {.column width="60%"}
+
+### Forecasting textbook pageviews
+
+Google Analytics data for the *Forecasting: Principles and Practice* textbook.
+
+::: {.callout-note}
+## Data overview
+
+* Daily page views since 1 January 2020
+* Disaggregated by *many* dimensions
+
+  (location, device, returning visit, web page, ...)
+
+:::
+
+Starting small with
+
+::: {style='font-family: monospace;'}
+deviceCategory\*(continent/subContinent/country)
+:::
+
+gives `r scales::comma(n_keys(fpp3_complete_agg_ts))` time series.
+
+:::
+:::
+
+![](backgrounds/fpp3_front_cover.jpg){.image-right}
+
+
+## {}
+
+![](resources/fpp3.svg){.sticker-float-right}
+
+::: {.hierarchy-grid}
+
+::: {.hierarchy-symbolic}
+deviceCategory\*(continent/subContinent/country)
+:::
+
+::: {.hierarchy-plot}
+```{r}
+#| fig-height: 7
+#| fig-width: 9
+fpp3_plot(1)
+```
+:::
+
+::: {.hierarchy-graph}
+```{r}
+fpp3_graph(1)
+```
+:::
+:::
+
+## {}
+
+![](resources/fpp3.svg){.sticker-float-right}
+
+::: {.hierarchy-grid}
+
+::: {.hierarchy-symbolic}
+deviceCategory\*([continent]{style="color: #084887;"}/subContinent/country)
+:::
+
+::: {.hierarchy-plot}
+```{r}
+#| fig-height: 7
+#| fig-width: 9
+fpp3_plot(2)
+```
+:::
+
+::: {.hierarchy-graph}
+```{r}
+fpp3_graph(2)
+```
+:::
+:::
+
+## {}
+
+![](resources/fpp3.svg){.sticker-float-right}
+
+::: {.hierarchy-grid}
+
+::: {.hierarchy-symbolic}
+deviceCategory\*([continent]{style="color: #084887;"}/[subContinent]{style="color: #8093f1;"}/country)
+:::
+
+::: {.hierarchy-plot}
+```{r}
+#| fig-height: 7
+#| fig-width: 9
+fpp3_plot(3)
+```
+:::
+
+::: {.hierarchy-graph}
+```{r}
+fpp3_graph(3)
+```
+:::
+:::
+
+## {}
+
+![](resources/fpp3.svg){.sticker-float-right}
+
+::: {.hierarchy-grid}
+
+::: {.hierarchy-symbolic}
+deviceCategory\*([continent]{style="color: #084887;"}/[subContinent]{style="color: #8093f1;"}/[country]{style="color: #fbb13c;"})
+:::
+
+::: {.hierarchy-plot}
+```{r}
+#| fig-height: 7
+#| fig-width: 9
+fpp3_plot(4)
+```
+:::
+
+::: {.hierarchy-graph}
+```{r}
+fpp3_graph(4)
+```
+:::
+:::
+
+## {}
+
+![](resources/fpp3.svg){.sticker-float-right}
+
+::: {.hierarchy-grid}
+
+::: {.hierarchy-symbolic}
+[deviceCategory]{style="color: #B388EB;"}\*([continent]{style="color: #084887;"}/[subContinent]{style="color: #8093f1;"}/[country]{style="color: #fbb13c;"})
+:::
+
+::: {.hierarchy-plot}
+```{r}
+#| fig-height: 7
+#| fig-width: 9
+fpp3_plot(5)
+```
+:::
+
+::: {.hierarchy-graph}
+```{r}
+fpp3_graph(5)
+```
+:::
+:::
+
+
+## {}
+
+::: columns
+::: {.column width="60%"}
+
+### Quality vs quantity
+
+Information quality varies with disaggregation depth.
+
+* aggregates have clear, strong patterns
+* disaggregates are intermittent and noisy
+
+::: {.fragment .fade-up}
+Large structures are dominated by *deeply disaggregated* series.
+
+::: {.callout-caution}
+## Model misspecification at scale
+
+Deeply disaggregated series are hard to forecast accurately, and can worsen reconciliation.
+:::
+:::
+
+:::
+:::
+
+![](backgrounds/arno-senoner-ynvV5b4zZM0-unsplash.jpg){.image-right}
+
+
+<!-- ---------------------------------------------------------------------- -->
+<!-- Method: graph pruning, explained with fpp3 pageviews                   -->
+<!-- ---------------------------------------------------------------------- -->
+
+
+## {}
+
+::: columns
+::: {.column width="60%"}
+
+### :bulb: Idea: graph pruning
+
+Many time series aren't interesting or useful.
+
+::: {.fragment .fade-in}
+::: {.callout-tip}
+## Simply don't forecast them!
+
+Removing uninformative series gives
+
+* less computation
+* less model misspecification
+* better forecast accuracy
+
+:::
+:::
+
+::: {.fragment .fade-in}
+::: {.callout-note}
+## From grouped to graph
+
+Made possible by **graph reconciliation**.
+
+Removing series breaks grouped coherency, so the relevant constraints must also be removed.
+:::
+:::
+
+:::
+:::
+
+![](backgrounds/pexels-shvetsa-5231048.jpg){.image-right}
+
+
+## {}
+
+::: columns
+::: {.column width="60%"}
+
+### :bulb: Idea: graph pruning
+
+::: {.callout-important}
+## Maintaining coherency
+
+Each disaggregation is **all or nothing**.
+
+An unwanted series can't be removed if its siblings are kept.
+:::
+
+::: {.fragment .fade-up}
+Two decisions:
+
+1. The **predicate**: is this series 'forecastable'?
+2. The **pruning rule**: are these disaggregates kept?
+:::
+
+:::
+:::
+
+![](backgrounds/pexels-shvetsa-5231048.jpg){.image-right}
+
+
+## {}
+
+::: columns
+::: {.column width="60%"}
+
+### The graph pruning procedure
+
+::: {.callout-note}
+## Feature-based graph search
+
+1. Start from the top series.
+2. Disaggregate, and test each child with the **predicate**.
+3. The **pruning rule** keeps all children, or none.
+4. Repeat below kept series, until none remain.
+5. Derive the pruned coherency constraints.
+:::
+
+::: {.fragment .fade-up}
+::: {.callout-tip}
+## Features of 'forecastability'
+
+* scale (average value)
+* intermittency (proportion of zeroes)
+* volatility (coefficient of variation)
+* structure (strength of seasonality)
+* graph features (depth, centrality)
+:::
+:::
+
+:::
+:::
+
+![](backgrounds/pexels-shvetsa-5231048.jpg){.image-right}
+
+
+## {}
+
+![](resources/fpp3.svg){.sticker-float-right}
+
+::: {.hierarchy-grid}
+
+::: {.hierarchy-symbolic}
+deviceCategory\*(continent/subContinent/country)
+:::
+
+::: {.hierarchy-plot}
+```{r}
+#| fig-height: 7
+#| fig-width: 9
+fpp3_plot(1)
+```
+:::
+
+::: {.hierarchy-graph}
+```{r}
+fpp3_graph(1, highlight = "lightgreen")
+```
+:::
+:::
+
+## {}
+
+![](resources/fpp3.svg){.sticker-float-right}
+
+::: {.hierarchy-grid}
+
+::: {.hierarchy-symbolic}
+deviceCategory\*([continent]{style="color: #084887;"}/subContinent/country)
+:::
+
+::: {.hierarchy-plot}
+```{r}
+#| fig-height: 7
+#| fig-width: 9
+fpp3_plot(2)
+```
+:::
+
+::: {.hierarchy-graph}
+```{r}
+fpp3_graph(2, highlight = c("lightgreen", "red", rep("lightgreen", 5)))
+```
+:::
+:::
+
+## {}
+
+![](resources/fpp3.svg){.sticker-float-right}
+
+::: {.hierarchy-grid}
+
+::: {.hierarchy-symbolic}
+deviceCategory\*([continent]{style="color: #084887;"}/[subContinent]{style="color: #8093f1;"}/country)
+:::
+
+::: {.hierarchy-plot}
+```{r}
+#| fig-height: 7
+#| fig-width: 9
+fpp3_plot(3)
+```
+:::
+
+::: {.hierarchy-graph}
+```{r}
+fpp3_graph(3, highlight = c("lightgreen", "red", rep("lightgreen", 9)))
+```
+:::
+:::
+
+## {}
+
+![](resources/fpp3.svg){.sticker-float-right}
+
+::: {.hierarchy-grid}
+
+::: {.hierarchy-symbolic}
+deviceCategory\*([continent]{style="color: #084887;"}/[subContinent]{style="color: #8093f1;"}/[country]{style="color: #fbb13c;"})
+:::
+
+::: {.hierarchy-plot}
+```{r}
+#| fig-height: 7
+#| fig-width: 9
+fpp3_plot(4)
+```
+:::
+
+::: {.hierarchy-graph}
+```{r}
+fpp3_graph(4, highlight = c("lightgreen", "red", rep("lightgreen", 13), rep("red", 3), rep("lightgreen", 2)))
+```
+:::
+:::
+
+## {}
+
+![](resources/fpp3.svg){.sticker-float-right}
+
+::: {.hierarchy-grid}
+
+::: {.hierarchy-symbolic}
+[deviceCategory]{style="color: #B388EB;"}\*([continent]{style="color: #084887;"}/[subContinent]{style="color: #8093f1;"}/[country]{style="color: #fbb13c;"})
+:::
+
+::: {.hierarchy-plot}
+```{r}
+#| fig-height: 7
+#| fig-width: 9
+fpp3_plot(5)
+```
+:::
+
+::: {.hierarchy-graph}
+```{r}
+fpp3_graph(5, highlight = c("lightgreen", "red", rep("lightgreen", 13), rep("red", 3), rep("lightgreen", 4), "red"))
+```
+:::
+:::
+
+## {}
+
+![](resources/fpp3.svg){.sticker-float-right}
+
+::: {.hierarchy-grid}
+
+::: {.hierarchy-symbolic}
+[deviceCategory]{style="color: #B388EB;"}\*([continent]{style="color: #084887;"}/[subContinent]{style="color: #8093f1;"}/[country]{style="color: #fbb13c;"})
+:::
+
+::: {.hierarchy-plot}
+```{r}
+#| fig-height: 7
+#| fig-width: 9
+fpp3_plot(5, .country = "Germany")
+```
+:::
+
+::: {.hierarchy-graph}
+```{r}
+fpp3_graph(5, highlight = c("lightgreen", "red", rep("lightgreen", 13), rep("red", 3), rep("lightgreen", 5)), .country = "Germany")
+```
+:::
+:::
+
+
+## {}
+
+::: columns
+::: {.column width="65%"}
+
+### Pruning pageviews
+
+```{r}
+#| echo: true
+#| eval: false
+pageviews |>
+  prune_aggregates(
+    deviceCategory * (continent / subContinent / country),
+    .predicate = mean(activeUsers) > 10 &
+      mean(activeUsers == 0) < 0.5,
+    .keep = \(x) mean(x) > 0.5,
+    activeUsers = sum(activeUsers)
+  )
+```
+
+```{r}
+series_depth <- function(x) {
+  x |>
+    key_data() |>
+    transmute(depth = (!is_aggregated(deviceCategory)) + (!is_aggregated(continent)) +
+      (!is_aggregated(subContinent)) + (!is_aggregated(country))) |>
+    count(depth)
+}
+full_join(
+  rename(series_depth(fpp3_complete_agg_ts), Complete = n),
+  rename(series_depth(fpp3_pruned_ts), Pruned = n),
+  by = "depth"
+) |>
+  mutate(Pruned = coalesce(Pruned, 0L), depth = as.character(depth)) |>
+  (\(x) bind_rows(x, summarise(x, depth = "Total", across(c(Complete, Pruned), sum))))() |>
+  gt() |>
+  cols_label(depth = "Depth") |>
+  fmt_number(decimals = 0) |>
+  tab_options(table.font.size = 22)
+```
+
+:::
+:::
+
+![](backgrounds/pexels-shvetsa-5231048.jpg){.image-right}
+
+
+<!-- ---------------------------------------------------------------------- -->
+<!-- Results: graph pruning at scale on Favorita                            -->
+<!-- ---------------------------------------------------------------------- -->
+
+
+## {}
+
+::: columns
+::: {.column width="60%"}
+
+### Grocery sales at scale
+
+Corporación Favorita: grocery sales across Ecuador.
+
+::: {.callout-note}
+## Data overview
+
+::: {style='font-family: monospace; font-size: 0.8em;'}
+(perishable/family/class/item_nbr)\*
+
+(((state/city)\*type\*cluster)/store_nbr)
+:::
+
+* 65 aggregation nodes, up to 9 levels deep
+* 361,311 distinct time series
+* ETS base forecasts, 12 months ahead, 3 forecast origins
+
+:::
+
+:::
+:::
+
+![](backgrounds/aleksandar-radovanovic-mXKXJI98aTE-unsplash.jpg){.image-right}
+
+
+## {}
+
+### Accuracy at depth
+
+```{r}
+#| fig-width: 12
+#| fig-height: 5.2
+#| out-width: 100%
+# Summarised from the Favorita application of mitchelloharawild/paper-graph-pruning
+favorita_depth_all <- read_csv("data/favorita-depth.csv", show_col_types = FALSE)
+favorita_depth <- favorita_depth_all |>
+  filter(series != "ols") |>
+  mutate(series = factor(series,
+    levels = c("fit", "base", "bu", "wls"),
+    labels = c("In-sample fit", "Base forecasts", "Bottom-up", "MinT (WLS)")
+  ))
+favorita_depth |>
+  ggplot(aes(x = depth, y = rmsse, colour = series)) +
+  geom_line(linewidth = 1.2) +
+  geom_point(size = 3) +
+  scale_x_continuous(breaks = 0:9) +
+  scale_colour_manual(values = result_colours) +
+  labs(x = "Disaggregation depth", y = "RMSSE", colour = NULL) +
+  theme_minimal(base_size = 20) +
+  theme(legend.position = "top")
+```
+
+::: columns
+::: {.column width="50%"}
+::: {.fragment .fade-up}
+::: {.callout-caution}
+## Fits better, forecasts worse
+
+Deep series are overfit, so their base forecasts are poor.
+:::
+:::
+:::
+::: {.column width="50%"}
+::: {.fragment .fade-up}
+::: {.callout-important}
+## Misspecification spreads
+
+With poor weights, MinT (OLS, off the chart) reaches an RMSSE of `r favorita_depth_all |> filter(series == "ols", depth == 3) |> pull(rmsse) |> round(1)` at depth 3.
+:::
+:::
+:::
+:::
+
+
+## {}
+
+::: columns
+::: {.column width="60%"}
+
+### Pruned reconciliation
+
+```{r}
+#| fig-width: 7.5
+#| fig-height: 4.5
+read_csv("data/favorita-prune.csv", show_col_types = FALSE) |>
+  pivot_longer(c(rmsse_complete, rmsse_pruned, scrps_complete, scrps_pruned), names_to = c("metric", "arm"), names_sep = "_") |>
+  group_by(rule, metric) |>
+  mutate(rel = value / value[arm == "complete"]) |>
+  filter(arm == "pruned") |>
+  ungroup() |>
+  mutate(metric = recode(metric, rmsse = "RMSSE", scrps = "sCRPS")) |>
+  ggplot(aes(x = reps, y = rel, colour = metric)) +
+  geom_hline(yintercept = 1, linetype = "dashed", colour = "grey50") +
+  geom_point(size = 4) +
+  scale_x_log10(labels = scales::comma) +
+  scale_y_continuous(labels = scales::percent) +
+  scale_colour_manual(values = result_colours) +
+  labs(x = "Series retained (of 361,311)", y = "Pruned / complete MinT (WLS)", colour = NULL) +
+  theme_minimal(base_size = 18) +
+  theme(legend.position = "top")
+```
+
+::: {.fragment .fade-up}
+::: {.callout-tip}
+## Less can be more
+
+With >1,500 series kept, pruning wins on both accuracy measures.
+:::
+:::
+
+:::
+:::
+
+![](backgrounds/firosnv-photography-Rr3B0LH7W3k-unsplash.jpg){.image-right}
+
+
+## {}
+
+::: columns
+::: {.column width="60%"}
+
+### Pruned reconciliation
+
+```{r}
+#| fig-width: 7.5
+#| fig-height: 4.5
+read_csv("data/favorita-compute.csv", show_col_types = FALSE) |>
+  mutate(stage = fct_inorder(stage)) |>
+  ggplot(aes(x = seconds / 3600, y = fct_rev(arm), fill = stage)) +
+  geom_col() +
+  scale_fill_manual(values = result_colours) +
+  labs(x = "Hours (per forecast origin)", y = NULL, fill = NULL) +
+  theme_minimal(base_size = 18) +
+  theme(legend.position = "bottom") +
+  guides(fill = guide_legend(nrow = 3))
+```
+
+::: {.fragment .fade-up}
+::: {.callout-tip}
+## Less computation
+
+* Reconciliation: ~3 hours → 5 seconds (cut-100)
+* Base forecasts: ~35$\times$ less compute
+:::
+:::
+
+:::
+:::
+
+![](backgrounds/firosnv-photography-Rr3B0LH7W3k-unsplash.jpg){.image-right}
+
+
+<!-- ---------------------------------------------------------------------- -->
+<!-- Opportunity: more dimensions                                           -->
+<!-- ---------------------------------------------------------------------- -->
+
+
+## {}
+
+### Pruning the supply chain
+
+The same grouped supply chain, pruned to at most 3 dimensions deep.
+
+```{r}
+supply_chain |>
+  select(Dimension, Count = l, Complete = `Total series`, Pruned = `Pruned series`) |>
+  fragment_table()
+```
+
+::: {.fragment .fade-up}
+Every dimension kept, a fraction of the series.
+:::
+
+
+## {}
+
+::: columns
+::: {.column width="60%"}
+
+### More dimensions
+
+::: {.callout-note}
+## :earth_asia: The big picture
+
+The raw pageview events have 100s of dimensions.
+
+A slightly larger structure:
+
+::: {style='font-family: monospace;'}
+operatingSystem\*browser\*language\*
+
+newVsReturning\*pageTitle\*deviceCategory\*
+
+(continent/country/city)
+:::
+
+has a total of... :drum:
+
+:::{.fragment .fade-in}
+::: {.callout-important}
+[**171,076,181,621,760** series!]{style='font-size: 50px'}
+:::
+:::
+:::
+
+::: {.fragment .fade-in}
+::: {.callout-tip}
+## :wastebasket: Pruning to depth 3
+
+**208,984** series, keeping every dimension.
+:::
+:::
+
+:::
+:::
+
+![](backgrounds/megan-o-hanlon-vwvnZ-jSo98-unsplash.jpg){.image-right}
+
+
+## {}
+
+::: columns
+::: {.column width="60%"}
+
+### More dimensions
+
+Graph pruning changes what's possible in reconciliation.
+
+::: {.callout-important}
+## Grouped constraints
+
+Require a **common bottom series**, so all disaggregates are forecast.
+
+To keep the data small, **useful dimensions are dropped**. :x:
+:::
+
+::: {.fragment .fade-in}
+::: {.callout-tip}
+## Graph constraints
+
+Any structure is coherent.
+
+To keep the data small, **useless series are dropped**. :white_check_mark:
+:::
+:::
+
+:::
+:::
+
+![](backgrounds/megan-o-hanlon-vwvnZ-jSo98-unsplash.jpg){.image-right}
+
+
+<!-- ====================================================================== -->
+<!-- Part 4: Future work                                                    -->
+<!-- ====================================================================== -->
+
+## {}
+
+::: columns
+::: {.column width="60%"}
+
+### Final comments
+
+::: {.callout-tip}
+## Key ideas
+
+1. Keys and mables scale forecasting to many series and models
+2. Graphs describe any coherency structure
+3. Be wary of **model misspecification** in large structures
+4. **Prune uninformative series**, keep useful dimensions
+:::
+
+::: {.fragment .fade-up}
+::: {.callout-paper}
+## Future work
+
+* Better measures of 'forecastability'
+* Lumping uninformative series into an 'other' series
+* A graph vocabulary for specifying which series to keep
+* Temporal and cross-temporal graphs
+* Finishing the software design and implementation
+:::
+:::
+
+:::
+:::
+
+![](backgrounds/meric-dagli-7NBO76G5JsE-unsplash.jpg){.image-right}
+
+
+## Thanks for your time!
+
+::: columns
+::: {.column width="60%"}
+
+::: {.callout-link}
+
+## Useful links
+
+![](resources/forum.svg){.icon} [social.mitchelloharawild.com](https://social.mitchelloharawild.com/)
+
+![](resources/projector-screen-outline.svg){.icon} [slides.mitchelloharawild.com/UoM2026](https://slides.mitchelloharawild.com/UoM2026)
+
+![](resources/github.svg){.icon} [mitchelloharawild/talk-graph-temporal-uom2026](https://github.com/mitchelloharawild/talk-graph-temporal-uom2026)
+
+:::
+
+:::
+:::
+
+![](backgrounds/meric-dagli-7NBO76G5JsE-unsplash.jpg){.image-right}
+
+
+## References

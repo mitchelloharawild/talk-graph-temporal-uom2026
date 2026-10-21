@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-56 -12 581.52 224" width="581.52" height="224">
+<rect x="0" y="0" width="402" height="200" rx="6" fill="#f6f8fa" stroke="#d0d7de"/>
+<rect x="3" y="4" width="396" height="192" rx="4" fill="#c2410c" fill-opacity="0.08" stroke="#c2410c" stroke-width="1.2" stroke-opacity="0.6" stroke-dasharray="4 3"/>
+<rect x="24.8" y="35" width="368.2" height="108" rx="4" fill="#c2410c" fill-opacity="0.08" stroke="#c2410c" stroke-width="1.2" stroke-opacity="1"/>
+<rect x="43.6" y="58" width="340" height="18" rx="4" fill="none" fill-opacity="0.08" stroke="#c2410c" stroke-width="1.2" stroke-opacity="1"/>
+<rect x="43.6" y="80" width="272.8" height="18" rx="4" fill="none" fill-opacity="0.08" stroke="#c2410c" stroke-width="1.2" stroke-opacity="1"/>
+<rect x="43.6" y="102" width="163.6" height="18" rx="4" fill="none" fill-opacity="0.08" stroke="#c2410c" stroke-width="1.2" stroke-opacity="1"/>
+<rect x="26.8" y="146" width="214" height="18" rx="4" fill="none" fill-opacity="0.08" stroke="#c2410c" stroke-width="1.2" stroke-opacity="1"/>
+<path d="M-2,4 L-8,4 L-8,196 L-2,196" fill="none" stroke="#c2410c" stroke-width="1.5" stroke-linejoin="round"/>
+<g transform="rotate(-90 -34 100)">
+<text x="-34" y="100" font-family="'Fira Code', 'DejaVu Sans Mono', Menlo, Consolas, monospace" font-size="13" fill="#c2410c" font-weight="bold" text-anchor="middle">mdl_spec</text>
+<text x="-34" y="113" font-family="'Helvetica Neue', Arial, sans-serif" font-size="11" fill="#57606a" font-weight="normal" text-anchor="middle">composite, passed to model()</text>
+</g>
+<path d="M404,35 L410,35 L410,143 L404,143" fill="none" stroke="#c2410c" stroke-width="1.5" stroke-linejoin="round"/>
+<text x="422" y="88" font-family="'Fira Code', 'DejaVu Sans Mono', Menlo, Consolas, monospace" font-size="13" fill="#c2410c" font-weight="bold" text-anchor="start">mdl_spec</text>
+<text x="422" y="101" font-family="'Helvetica Neue', Arial, sans-serif" font-size="11" fill="#57606a" font-weight="normal" text-anchor="start">nested composite</text>
+<path d="M240.8,155 H416" stroke="#c2410c" stroke-width="1.5" fill="none"/>
+<circle cx="240.8" cy="155" r="2.5" fill="#c2410c"/>
+<text x="422" y="154" font-family="'Fira Code', 'DejaVu Sans Mono', Menlo, Consolas, monospace" font-size="13" fill="#c2410c" font-weight="bold" text-anchor="start">mdl_spec</text>
+<text x="422" y="167" font-family="'Helvetica Neue', Arial, sans-serif" font-size="11" fill="#57606a" font-weight="normal" text-anchor="start">component</text>
+<text x="12" y="27.4" font-family="'Fira Code', 'DejaVu Sans Mono', Menlo, Consolas, monospace" font-size="14" fill="#24292f" xml:space="preserve" style="white-space:pre" textLength="151.2" lengthAdjust="spacing"><tspan fill="#0969da">combination_model</tspan><tspan>(</tspan></text>
+<text x="12" y="49.4" font-family="'Fira Code', 'DejaVu Sans Mono', Menlo, Consolas, monospace" font-size="14" fill="#24292f" xml:space="preserve" style="white-space:pre" textLength="184.8" lengthAdjust="spacing"><tspan>  </tspan><tspan fill="#0969da">decomposition_model</tspan><tspan>(</tspan></text>
+<text x="12" y="71.4" font-family="'Fira Code', 'DejaVu Sans Mono', Menlo, Consolas, monospace" font-size="14" fill="#24292f" xml:space="preserve" style="white-space:pre" textLength="378" lengthAdjust="spacing"><tspan>    </tspan><tspan fill="#0969da">STL</tspan><tspan>(Trips </tspan><tspan fill="#cf222e">~</tspan><tspan> </tspan><tspan fill="#0969da">season</tspan><tspan>(window </tspan><tspan fill="#cf222e">=</tspan><tspan> </tspan><tspan fill="#116329">"periodic"</tspan><tspan>)),</tspan></text>
+<text x="12" y="93.4" font-family="'Fira Code', 'DejaVu Sans Mono', Menlo, Consolas, monospace" font-size="14" fill="#24292f" xml:space="preserve" style="white-space:pre" textLength="310.8" lengthAdjust="spacing"><tspan>    </tspan><tspan fill="#0969da">ETS</tspan><tspan>(season_adjust </tspan><tspan fill="#cf222e">~</tspan><tspan> </tspan><tspan fill="#0969da">trend</tspan><tspan>(</tspan><tspan fill="#116329">"Ad"</tspan><tspan>)),</tspan></text>
+<text x="12" y="115.4" font-family="'Fira Code', 'DejaVu Sans Mono', Menlo, Consolas, monospace" font-size="14" fill="#24292f" xml:space="preserve" style="white-space:pre" textLength="193.2" lengthAdjust="spacing"><tspan>    </tspan><tspan fill="#0969da">SNAIVE</tspan><tspan>(season_year)</tspan></text>
+<text x="12" y="137.4" font-family="'Fira Code', 'DejaVu Sans Mono', Menlo, Consolas, monospace" font-size="14" fill="#24292f" xml:space="preserve" style="white-space:pre" textLength="33.6" lengthAdjust="spacing"><tspan>  ),</tspan></text>
+<text x="12" y="159.4" font-family="'Fira Code', 'DejaVu Sans Mono', Menlo, Consolas, monospace" font-size="14" fill="#24292f" xml:space="preserve" style="white-space:pre" textLength="226.8" lengthAdjust="spacing"><tspan>  </tspan><tspan fill="#0969da">ARIMA</tspan><tspan>(Trips </tspan><tspan fill="#cf222e">~</tspan><tspan> </tspan><tspan fill="#0969da">pdq</tspan><tspan>(d </tspan><tspan fill="#cf222e">=</tspan><tspan> </tspan><tspan fill="#1b7c83">1</tspan><tspan>))</tspan></text>
+<text x="12" y="181.4" font-family="'Fira Code', 'DejaVu Sans Mono', Menlo, Consolas, monospace" font-size="14" fill="#24292f" xml:space="preserve" style="white-space:pre" textLength="8.4" lengthAdjust="spacing"><tspan>)</tspan></text>
+</svg>

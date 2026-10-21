@@ -198,8 +198,6 @@ div.callout-question .callout-icon::before {
 }
 div.callout-question {
   border-left-color: #04d42c !important;
-  overflow: auto;
-  white-space: nowrap;
 }
 
 
@@ -208,16 +206,12 @@ div.callout-pro .callout-icon::before {
 }
 div.callout-pro {
   border-left-color: #04d42c !important;
-  overflow: auto;
-  white-space: nowrap;
 }
 div.callout-con .callout-icon::before {
   background-image: url('resources/cross.svg');
 }
 div.callout-con {
   border-left-color: #d9534f !important;
-  overflow: auto;
-  white-space: nowrap;
 }
 
 span.danger {
@@ -265,6 +259,11 @@ span.term {
   padding: 0 25px;
 }
 
+/* Keep the symbolic structure clear of the sticker in the top right */
+.hierarchy-grid > .hierarchy-symbolic {
+  padding-right: 170px;
+}
+
 .inline-img {
   margin-top: -2em;
   height: 2em;
@@ -272,7 +271,8 @@ span.term {
   top: 1em;
 }
 
-.fragment-remove .fragment.fade-out.visible {
+.fragment-remove .fragment.fade-out.visible,
+.fragment-remove .fragment.fade-in-then-out.visible:not(.current-fragment) {
     display: none;
     height:0px;
     line-height: 0px;
@@ -324,4 +324,19 @@ details {
 .pkg h2,
 .pkg h3 {
   margin-top: 0;
+}
+/* Tables built up row by row with fragment_table() */
+.reveal table.fragment-table {
+  font-size: 24px;
+  margin: 0.5em auto;
+  border-collapse: collapse;
+}
+.reveal table.fragment-table th,
+.reveal table.fragment-table td {
+  padding: 0.2em 0.8em;
+  border-bottom: 1px solid #ddd;
+}
+.reveal table.fragment-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }

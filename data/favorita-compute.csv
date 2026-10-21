@@ -1,0 +1,14 @@
+arm,stage,seconds
+Complete,Base forecasts (ETS),77125.7
+Complete,Sample paths,62023.8
+Complete,Reconcile (MinT WLS),10381.1
+Pruned (cut-100),Pruning,2.2
+Pruned (cut-100),Coherency structure,63.6
+Pruned (cut-100),Base forecasts (ETS),2200.0
+Pruned (cut-100),Sample paths,987.7
+Pruned (cut-100),Reconcile (MinT WLS),4.9
+Pruned (zero-010),Pruning,2.5
+Pruned (zero-010),Coherency structure,120.1
+Pruned (zero-010),Base forecasts (ETS),5347.3
+Pruned (zero-010),Sample paths,2475.2
+Pruned (zero-010),Reconcile (MinT WLS),21.4

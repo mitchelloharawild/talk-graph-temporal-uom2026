@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-6 29 862.6 158" width="862.6" height="158">
+<defs>
+<marker id="ah" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#24292f"/></marker>
+</defs>
+<path d="M0,70 H149.6" fill="none" stroke="#24292f" stroke-width="1.5" stroke-linecap="round" marker-end="url(#ah)"/>
+<text x="76.3" y="62" font-family="'Fira Code', 'DejaVu Sans Mono', Menlo, Consolas, monospace" font-size="13" fill="#24292f" font-weight="normal" text-anchor="middle">as_tsibble()</text>
+<text x="76.3" y="88" font-family="'Helvetica Neue', Arial, sans-serif" font-size="10" fill="#57606a" font-weight="bold" letter-spacing="1" text-anchor="middle">PREPARE</text>
+<path d="M0,146 H149.6" fill="none" stroke="#24292f" stroke-width="1.5" stroke-linecap="round" marker-end="url(#ah)"/>
+<text x="76.3" y="138" font-family="'Fira Code', 'DejaVu Sans Mono', Menlo, Consolas, monospace" font-size="13" fill="#24292f" font-weight="normal" text-anchor="middle">ETS()/ARIMA()/...</text>
+<text x="76.3" y="164" font-family="'Helvetica Neue', Arial, sans-serif" font-size="10" fill="#57606a" font-weight="bold" letter-spacing="1" text-anchor="middle">SPECIFY</text>
+<path d="M312.6,70 C337.6,70 336.6,108 356.6,108" fill="none" stroke="#24292f" stroke-width="1.5" stroke-linecap="round"/>
+<path d="M312.6,146 C337.6,146 336.6,108 356.6,108" fill="none" stroke="#24292f" stroke-width="1.5" stroke-linecap="round"/>
+<path d="M356.6,108 H429.6" fill="none" stroke="#24292f" stroke-width="1.5" stroke-linecap="round" marker-end="url(#ah)"/>
+<text x="394.6" y="100" font-family="'Fira Code', 'DejaVu Sans Mono', Menlo, Consolas, monospace" font-size="13" fill="#24292f" font-weight="normal" text-anchor="middle">model()</text>
+<text x="394.6" y="126" font-family="'Helvetica Neue', Arial, sans-serif" font-size="10" fill="#57606a" font-weight="bold" letter-spacing="1" text-anchor="middle">ESTIMATE</text>
+<path d="M592.6,108 H687.6" fill="none" stroke="#24292f" stroke-width="1.5" stroke-linecap="round" marker-end="url(#ah)"/>
+<text x="641.6" y="100" font-family="'Fira Code', 'DejaVu Sans Mono', Menlo, Consolas, monospace" font-size="13" fill="#24292f" font-weight="normal" text-anchor="middle">forecast()</text>
+<text x="641.6" y="126" font-family="'Helvetica Neue', Arial, sans-serif" font-size="10" fill="#57606a" font-weight="bold" letter-spacing="1" text-anchor="middle">FORECAST</text>
+<rect x="152.6" y="39" width="160" height="62" rx="6" fill="#f6f8fa" stroke="#d0d7de"/>
+<text x="232.6" y="61" font-family="'Fira Code', 'DejaVu Sans Mono', Menlo, Consolas, monospace" font-size="15" fill="#24292f" font-weight="bold" text-anchor="middle">tsibble</text>
+<text x="232.6" y="77" font-family="'Fira Code', 'DejaVu Sans Mono', Menlo, Consolas, monospace" font-size="12.5" fill="#c2410c" font-weight="bold" text-anchor="middle">tbl_ts</text>
+<text x="232.6" y="92" font-family="'Helvetica Neue', Arial, sans-serif" font-size="11" fill="#57606a" font-weight="normal" text-anchor="middle">index + key</text>
+<rect x="152.6" y="115" width="160" height="62" rx="6" fill="#f6f8fa" stroke="#d0d7de"/>
+<text x="232.6" y="137" font-family="'Fira Code', 'DejaVu Sans Mono', Menlo, Consolas, monospace" font-size="15" fill="#24292f" font-weight="bold" text-anchor="middle">specification</text>
+<text x="232.6" y="153" font-family="'Fira Code', 'DejaVu Sans Mono', Menlo, Consolas, monospace" font-size="12.5" fill="#c2410c" font-weight="bold" text-anchor="middle">mdl_spec</text>
+<text x="232.6" y="168" font-family="'Helvetica Neue', Arial, sans-serif" font-size="11" fill="#57606a" font-weight="normal" text-anchor="middle">response + specials</text>
+<rect x="432.6" y="77" width="160" height="62" rx="6" fill="#f6f8fa" stroke="#d0d7de"/>
+<text x="512.6" y="99" font-family="'Fira Code', 'DejaVu Sans Mono', Menlo, Consolas, monospace" font-size="15" fill="#24292f" font-weight="bold" text-anchor="middle">mable</text>
+<text x="512.6" y="115" font-family="'Fira Code', 'DejaVu Sans Mono', Menlo, Consolas, monospace" font-size="12.5" fill="#c2410c" font-weight="bold" text-anchor="middle">mbl_df</text>
+<text x="512.6" y="130" font-family="'Helvetica Neue', Arial, sans-serif" font-size="11" fill="#57606a" font-weight="normal" text-anchor="middle">key + models</text>
+<rect x="690.6" y="77" width="160" height="62" rx="6" fill="#f6f8fa" stroke="#d0d7de"/>
+<text x="770.6" y="99" font-family="'Fira Code', 'DejaVu Sans Mono', Menlo, Consolas, monospace" font-size="15" fill="#24292f" font-weight="bold" text-anchor="middle">fable</text>
+<text x="770.6" y="115" font-family="'Fira Code', 'DejaVu Sans Mono', Menlo, Consolas, monospace" font-size="12.5" fill="#c2410c" font-weight="bold" text-anchor="middle">fbl_df</text>
+<text x="770.6" y="130" font-family="'Helvetica Neue', Arial, sans-serif" font-size="11" fill="#57606a" font-weight="normal" text-anchor="middle">index + key + dist</text>
+</svg>
