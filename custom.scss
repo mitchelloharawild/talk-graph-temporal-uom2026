@@ -366,6 +366,17 @@ details {
   font-weight: 600;
 }
 
+/* A summed row, and a row for comparison against the rest of the table */
+.reveal table.fragment-table tr.total td {
+  color: $deck-navy;
+  font-weight: 700;
+  border-top: 2px solid $deck-ink;
+}
+.reveal table.fragment-table tr.comparison td {
+  color: $deck-red;
+  font-weight: 600;
+}
+
 /* Figure panels take the place of a side photo: the graph walk's grey panel,
    with an optional monospace band (.figure-band) for the structure's formula.
    Pair with a 57% spacer + 43% text column (or 43% text column alone). */

@@ -1903,22 +1903,29 @@ supply_chain <- tribble(
     `Pruned series` = vapply(seq_len(n()), \(x) total_grouped_series(l[seq_len(x)], depth = pmin(x, 3)), double(1L))
   )
 
-# A table whose rows are revealed one at a time, for building up dimensionality
-fragment_table <- function(data, highlight = character()) {
-  num <- vapply(data, is.numeric, logical(1L))
+# A table whose rows are revealed one at a time, for building up dimensionality.
+# `reveal` picks the rows shown as fragments, `row_class` styles rows (e.g. "total"),
+# `right` aligns text columns like numbers, and an NA cell is merged into the cell before it
+fragment_table <- function(data, highlight = character(), reveal = seq_len(nrow(data))[-1],
+                           row_class = character(nrow(data)), right = character()) {
+  num <- vapply(data, is.numeric, logical(1L)) | names(data) %in% right
   hl <- names(data) %in% highlight
   row <- function(values, tag, ...) {
-    cells <- Map(\(v, n, h) tag(
+    na <- vapply(values, \(v) is.atomic(v) && length(v) == 1L && is.na(v), logical(1L))
+    span <- tabulate(cumsum(!na))
+    cells <- Map(\(v, n, h, s) tag(
       if (is.numeric(v)) scales::comma(v) else v,
-      class = paste(c(if (n) "num", if (h) "highlight"), collapse = " ")
-    ), values, num, hl)
+      class = paste(c(if (n) "num", if (h) "highlight"), collapse = " "),
+      colspan = if (s > 1) s
+    ), values[!na], num[!na], hl[!na], span)
     htmltools::tags$tr(..., unname(cells))
   }
   htmltools::tags$table(
     class = "fragment-table",
     htmltools::tags$thead(row(as.list(names(data)), htmltools::tags$th)),
     htmltools::tags$tbody(lapply(seq_len(nrow(data)), \(i) {
-      row(as.list(data[i, ]), htmltools::tags$td, class = if (i > 1) "fragment")
+      cls <- paste(c(if (i %in% reveal) "fragment", row_class[[i]]), collapse = " ")
+      row(as.list(data[i, ]), htmltools::tags$td, class = if (nzchar(cls)) cls)
     }))
   )
 }
