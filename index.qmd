@@ -672,6 +672,42 @@ tidygraph::tbl_graph(
 :::
 
 
+## {}
+
+::: columns
+::: {.column width="60%"}
+
+### Structure as a formula
+
+`aggregate_key()` describes the graph with a symbolic formula, like factors in `lm()`.
+
+::: {.callout-note}
+## Operators
+
+| Formula | Meaning | Expands to |
+|---|---|---|
+| `a + b` | separately | `1 + a + b` |
+| `a / b` | nested | `1 + a + a:b` |
+| `a * b` | crossed | `1 + a + b + a:b` |
+| `a * b - a` | remove a term | `1 + b + a:b` |
+:::
+
+::: {.fragment .fade-up}
+::: {.callout-tip}
+## The intercept is the total
+
+`1` (implied) is the common root node (the total)
+
+`0` drops it, leaving disjoint graphs.
+:::
+:::
+
+:::
+:::
+
+![](backgrounds/sander-weeteling-KABfjuSOx74-unsplash.jpg){.image-right}
+
+
 ## {auto-animate=true}
 
 ### Grouped coherence in software
