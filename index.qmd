@@ -985,6 +985,288 @@ Temporal aggregates are keyed by their `.granule`.
 ## {}
 
 ::: columns
+::: {.column width="57%"}
+:::
+::: {.column width="43%"}
+### Cross-temporal coherence
+
+::: {.callout-note}
+Every series is disaggregated both cross-sectionally and temporally.
+
+Edge colours show the [cross-sectional]{style="color: #1B998B;"} and [temporal]{style="color: #C33C8A;"} constraints.
+:::
+
+::: {.callout-paper}
+Cross-temporal reconciliation is described in @kourentzes2019cross and @difonzo2023cross.
+:::
+
+::: {.fragment .fade-in}
+::: {.callout-question}
+## What type of coherence structure is this?
+
+::: {.fragment .fade-in}
+Aggregate over time or origin first, so it's [**grouped**]{.term}.
+:::
+:::
+:::
+
+:::
+:::
+
+::: {.figure-left}
+::: {.figure-band}
+Origin × year(1L) / quarter(2L)
+:::
+
+```{r}
+tidygraph::tbl_graph(
+  nodes = tibble(label = c(
+    "Visitors\nYear", "Interstate\nYear", "Int'l\nYear",
+    "Visitors\nH1", "Visitors\nH2",
+    "Interstate\nH1", "Interstate\nH2", "Int'l\nH1", "Int'l\nH2"
+  )),
+  edges = tibble(
+    from  = c(1, 1, 4, 4, 5, 5,    1, 1, 2, 2, 3, 3),
+    to    = c(2, 3, 6, 8, 7, 9,    4, 5, 6, 7, 8, 9),
+    grp   = c(1, 1, 1, 1, 1, 1,    2, 2, 2, 2, 2, 2),
+    color = constraint_colours[grp]
+  )
+) |>
+  visnetwork_graph(width = 740, height = 560) |>
+  visNodes(font = list(size = 22))
+```
+:::
+
+
+## {}
+
+### Cross-temporal coherence in software
+
+`aggregate_key()` then `aggregate_index()`: tourism by purpose and state, by quarter, half-year and year.
+
+```{r}
+#| echo: true
+#| R.options: !expr list(pillar.print_min = 3, pillar.print_max = 3)
+tourism |>
+  aggregate_key(Purpose * State, Trips = sum(Trips)) |>
+  aggregate_index(
+    list(quarter(1L), quarter(2L), year(1L)),
+    Trips = sum(Trips)
+  )
+```
+
+::: {.fragment .fade-up}
+::: {.callout-tip}
+45 series × 3 granularities = 135 series in the key.
+:::
+:::
+
+
+## {}
+
+::: columns
+::: {.column width="60%"}
+### Cross-temporal coherence
+
+Cross-temporal graphs grow quickly.
+
+::: {.callout-note}
+## Australian tourism
+
+* 45 series by purpose and state
+* 7 temporal aggregates of each year (year, halves, quarters)
+:::
+
+::: {.fragment .fade-in}
+That's 45 × 7 = 315 coherent forecasts for each year ahead.
+:::
+
+::: {.fragment .fade-in}
+::: {.callout-question}
+## Are all of these series worth forecasting?
+:::
+:::
+
+:::
+:::
+
+![](backgrounds/courtney-smith-pCLKkPHpCz0-unsplash.jpg){.image-right}
+
+
+## {}
+
+### Three kinds of coherence
+
+Reconciliation adjusts related forecasts so they add up correctly (coherent).
+
+Related time series are described in three ways:
+
+::: columns
+
+::: {.column width="33%"}
+::: {.callout-note icon=false}
+## 📚 Hierarchical
+
+One path from top to bottom.
+
+```{dot}
+//| fig-height: 3
+//| fig-width: 4
+digraph G {
+
+  rankdir = TD;
+  splines = line;
+  subgraph cluster_1 {
+    style = dashed;
+    color = grey60;
+    AX;
+    AY;
+    BX;
+    BY;
+    label = Bottom;
+  }
+
+  subgraph cluster_0 {
+    style = dashed;
+    color = grey60;
+    Total -> A;
+    Total -> B;
+    A -> AX;
+    A -> AY;
+    B -> BX;
+    B -> BY;
+    label = Upper;
+  }
+}
+```
+:::
+:::
+
+::: {.column width="33%"}
+::: {.callout-note icon=false}
+## 📚 Grouped
+
+Many paths from top to bottom.
+
+```{dot}
+//| fig-height: 3
+//| fig-width: 4
+digraph G {
+  rankdir = TD;
+  splines = line;
+  
+  subgraph cluster_0 {
+    style = dashed;
+    color = grey60;
+    BY;
+    BX;
+    AY;
+    AX;
+    label = Bottom;
+  }
+  subgraph cluster_1 {
+    style = dashed;
+    color = grey60;
+    Total;
+    label = Top;
+  }
+  subgraph cluster_2 {
+    style = dashed;
+    color = grey60;
+    A;
+    B;
+    label = "Path AB";
+  }
+  subgraph cluster_3 {
+    style = dashed;
+    color = grey60;
+    X;
+    Y;
+    label = "Path XY";
+  }
+  
+  Total -> X [style=dashed];
+  Total -> Y [style=dashed];
+  X -> AX [style=dashed];
+  X -> BX [style=dashed];
+  Y -> AY [style=dashed];
+  Y -> BY [style=dashed];
+  Total -> A;
+  Total -> B;
+  A -> AX;
+  A -> AY;
+  B -> BX;
+  B -> BY;
+}
+```
+
+:::
+:::
+::: {.column width="33%"}
+::: {.callout-tip icon=false}
+## 💡 Graph
+
+Many paths from (many) top to (many) bottom series.
+
+```{dot}
+//| fig-height: 3
+//| fig-width: 4
+digraph G {
+
+  rankdir = TD;
+  splines = line;
+  subgraph cluster_1 {
+    style = dashed;
+    color = grey60;
+    X2;
+    X1;
+    Y;
+    label = "Unconstrained XY";
+  }
+  subgraph cluster_2 {
+    style = dashed;
+    color = grey60;
+    B2;
+    B1;
+    A3;
+    A2;
+    A1;
+    label = "Unconstrained AB";
+  }
+
+  subgraph cluster_0 {
+    style = dashed;
+    color = grey60;
+    Total;
+    X;
+    A;
+    B;
+    
+    Total -> A;
+    Total -> B;
+    A -> A1;
+    A -> A2;
+    A -> A3;
+    B -> B1;
+    B -> B2;
+    Total -> X [style=dashed];
+    Total -> Y [style=dashed];
+    X -> X1 [style=dashed];
+    X -> X2 [style=dashed];
+    label = Constrained;
+  }
+  
+}
+```
+:::
+:::
+
+:::
+
+
+## {}
+
+::: columns
 ::: {.column width="60%"}
 ### Graph coherence
 
