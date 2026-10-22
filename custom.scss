@@ -262,15 +262,15 @@ span.term {
 }
 
 
-/* Animated graph walks fill the whole letterboxed slide (see resources/graph-walk) */
-.graph-walk, .graph-recap {
+/* Animated graph walks and the explorer fill the whole letterboxed slide (see resources/) */
+.graph-walk, .graph-recap, .graph-explore {
   @include full-screen;
   left: -$border-leftright-width;
   z-index: 0;
 }
 
-/* Fragments that only step a graph walk, so they take no space */
-.graph-walk-step {
+/* Fragments that only step a graph walk or explorer, so they take no space */
+.graph-walk-step, .graph-explore-step {
   position: absolute;
   width: 0;
   height: 0;

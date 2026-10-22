@@ -231,18 +231,25 @@ block_range <- function(y, n = 14) {
     signif(3)
 }
 
-graph_widget <- function(class, spec, steps = 0) {
+# Quarto copies a dependency once per name and version (into site_libs), so the
+# version changes with the files' contents or edits would never reach the deck
+resource_version <- function(dir) {
+  md5 <- tools::md5sum(list.files(dir, full.names = TRUE))
+  paste0("1.0.", sum(strtoi(substr(md5, 1, 7), 16L)) %% 1e8)
+}
+
+graph_widget <- function(class, spec, steps = 0, step_class = "graph-walk-step", resources = "graph-walk") {
   json <- jsonlite::toJSON(spec, auto_unbox = TRUE, null = "null", na = "null", digits = NA)
   tagList(
     div(
       class = class,
       tags$script(type = "application/json", HTML(gsub("</", "<\\/", json, fixed = TRUE)))
     ),
-    lapply(seq_len(steps), \(i) span(class = "fragment graph-walk-step")),
+    lapply(seq_len(steps), \(i) span(class = paste("fragment", step_class))),
     htmlDependency(
-      "graph-walk", "1.0.0",
-      src = normalizePath("resources/graph-walk"),
-      script = "graph-walk.js", stylesheet = "graph-walk.css"
+      resources, resource_version(file.path("resources", resources)),
+      src = normalizePath(file.path("resources", resources)),
+      script = paste0(resources, ".js"), stylesheet = paste0(resources, ".css")
     )
   )
 }

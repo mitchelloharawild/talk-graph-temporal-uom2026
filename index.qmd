@@ -31,6 +31,8 @@ library(ggtime)
 source("R/prune.R")
 # Animated graph walks that explain pruning
 source("R/graph-walk.R")
+# Interactive explorer of the series graph through the dimension graph
+source("R/graph-explore.R")
 options(width = 75)
 
 # Deck palette, mirrored in custom.scss

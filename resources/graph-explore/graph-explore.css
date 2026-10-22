@@ -1,0 +1,238 @@
+/* Interactive graph explorer (graph-explore.js). Shares the walk's stage
+   (band, series pane, grey graph pane, depth palette) under its own gx-
+   prefix, as both load in the same deck. Edges take the colour of the
+   variable they add (constraint_colours). */
+
+.gx-stage {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  font-size: 16px;
+  line-height: 1.2;
+  text-align: left;
+  color: #1a1a1a;
+}
+.gx-stage svg { overflow: visible; display: block; }
+
+/* Structure */
+.gx-band {
+  position: absolute;
+  left: 0; top: 0; right: 0;
+  height: 100px;
+  background: #BFBFBF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: monospace;
+  font-size: 26px;
+  white-space: pre;
+}
+.gx-term {
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-decoration-thickness: 4px;
+  text-underline-offset: 8px;
+  transition: text-decoration-color .3s;
+}
+.gx-term.gx-active { font-weight: 700; }
+
+/* Series pane */
+.gx-series {
+  position: absolute;
+  left: 0;
+  box-sizing: border-box;
+  padding: 22px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.gx-head { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.gx-swatch { width: 11px; height: 11px; border-radius: 50%; flex: none; }
+.gx-head-label { font-size: 20px; font-weight: 700; white-space: nowrap; }
+.gx-head-sub { font-size: 15px; color: #555; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gx-spark { fill: none; stroke: #1a1a1a; stroke-width: 1.5; stroke-linejoin: round; }
+.gx-axis { font-size: 12px; fill: #6a6a6a; font-variant-numeric: tabular-nums; }
+.gx-grid { stroke: #e3e3e3; stroke-width: 1; }
+.gx-tick { font-size: 10px; fill: #7a7a7a; font-variant-numeric: tabular-nums; }
+.gx-tick-line { stroke: #e2e2e2; stroke-width: 1; }
+.gx-sections { display: flex; flex-direction: column; gap: 12px; min-height: 0; flex: 1; }
+.gx-section-head {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 6px;
+  font-size: 13px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: #474747;
+}
+.gx-vk { width: 18px; height: 0; border-top: 3px solid currentColor; }
+.gx-cells { display: grid; gap: 8px 10px; }
+.gx-cell { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.gx-cell-head { display: flex; align-items: center; gap: 5px; font-size: 14px; min-width: 0; }
+.gx-cell-label { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gx-cell.gx-shared .gx-cell-label::after { content: " · 2nd parent"; font-weight: 400; color: #5E5E5E; }
+.gx-empty { font-size: 16px; color: #6a6a6a; line-height: 1.4; }
+.gx-banner {
+  margin-top: auto;
+  min-height: 64px;
+  font-size: 17px;
+  line-height: 1.35;
+  color: #2b2b2b;
+  border-top: 1px solid #d6d6d6;
+  padding-top: 10px;
+}
+
+/* Graph pane */
+.gx-graph { position: absolute; background: #E5E5E5; overflow: hidden; }
+.gx-layer { position: absolute; left: 0; top: 0; }
+.gx-node {
+  position: absolute;
+  width: 36px; height: 36px;
+  padding: 0; border: 0; background: none;
+  cursor: pointer;
+  z-index: 2;
+  font: inherit; color: inherit;
+  transition: left .7s cubic-bezier(.4, 0, .2, 1), top .7s cubic-bezier(.4, 0, .2, 1), opacity .5s ease, transform .7s cubic-bezier(.4, 0, .2, 1);
+}
+.gx-node:focus-visible { outline: 3px solid #8093F1; outline-offset: 2px; }
+.gx-ring { position: absolute; left: 5px; top: 5px; width: 26px; height: 26px; }
+.gx-dot {
+  width: 26px; height: 26px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  transition: box-shadow .3s, transform .2s;
+}
+.gx-node:hover .gx-dot { transform: scale(1.12); }
+.gx-node.gx-menu-on .gx-dot { box-shadow: 0 0 0 3px #E5E5E5, 0 0 0 5px #1A1A1A; }
+.gx-node.gx-multi .gx-dot { border: 3px solid #1A1A1A; }
+.gx-halo {
+  position: absolute;
+  left: -9px; top: -9px;
+  width: 44px; height: 44px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 2px solid #1a1a1a;
+  animation: gx-pulse 1.6s ease-out infinite;
+  display: none;
+}
+.gx-node.gx-focus .gx-halo { display: block; }
+.gx-label {
+  position: absolute;
+  left: 18px; top: 36px;
+  transform: translateX(-50%);
+  transform-origin: 0 0;
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+  transition: transform .5s, font-size .3s;
+}
+.gx-node.gx-tilt .gx-label { top: 34px; left: 22px; font-size: 13px; transform: rotate(38deg); }
+.gx-more {
+  position: absolute;
+  z-index: 2;
+  transform: translate(-50%, -50%);
+  padding: 1px 7px;
+  border: 1px dashed #8a8a8a;
+  border-radius: 9px;
+  background: #ececec;
+  color: #474747;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: left .7s cubic-bezier(.4, 0, .2, 1), top .7s cubic-bezier(.4, 0, .2, 1), opacity .4s;
+}
+.gx-more:hover { border-color: #1A1A1A; color: #1A1A1A; }
+
+.gx-edge {
+  position: absolute;
+  height: 0;
+  transform-origin: 0 0;
+  z-index: 1;
+  pointer-events: none;
+  transition: left .7s cubic-bezier(.4, 0, .2, 1), top .7s cubic-bezier(.4, 0, .2, 1), width .7s cubic-bezier(.4, 0, .2, 1), transform .7s cubic-bezier(.4, 0, .2, 1), opacity .4s;
+}
+.gx-line { width: 100%; height: 0; border-top: 2px solid #8e8e8e; transform-origin: 0 0; transition: transform .55s ease-out; }
+.gx-edge.gx-second .gx-line { border-top-width: 3px; }
+.gx-edge.gx-second.gx-new .gx-line { animation: gx-flash 1.4s ease-out 1; }
+
+/* Dimension menu */
+.gx-menu { position: absolute; z-index: 5; display: flex; gap: 6px; transform: translateX(-50%); }
+.gx-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px 5px 10px;
+  border: 1.5px solid #1A1A1A;
+  border-radius: 15px;
+  background: #fff;
+  color: #1A1A1A;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: 0 4px 10px -6px rgba(0, 0, 0, .45);
+  animation: gx-pop .28s cubic-bezier(.2, .8, .3, 1.25) both;
+}
+.gx-chip:nth-child(2) { animation-delay: .05s; }
+.gx-chip:hover { background: #1A1A1A; color: #fff; }
+.gx-chip:focus-visible { outline: 3px solid #8093F1; outline-offset: 2px; }
+.gx-chip.gx-done { border-style: dashed; background: #f4f4f4; }
+.gx-n { font-weight: 400; color: #555; font-variant-numeric: tabular-nums; }
+.gx-chip:hover .gx-n { color: #ddd; }
+.gx-key { width: 14px; height: 0; border-top: 3px solid currentColor; }
+.gx-tag {
+  padding: 2px 9px;
+  border: 1px dashed #5E5E5E;
+  border-radius: 11px;
+  background: #ececec;
+  color: #5E5E5E;
+  font-size: 13px;
+  white-space: nowrap;
+  animation: gx-pop .25s ease both;
+}
+
+/* Dimension graph and path, along the bottom of the graph pane */
+.gx-strip {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  box-sizing: border-box;
+  padding: 10px 22px;
+  border-top: 1px solid #c9c9c9;
+  background: #DCDCDC;
+  display: flex;
+  gap: 24px;
+  z-index: 3;
+}
+.gx-inset { display: flex; flex-direction: column; gap: 2px; flex: none; }
+.gx-caps { font-size: 13px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: #474747; }
+.gx-inset text { font-size: 13px; fill: #8a8a8a; }
+.gx-dn text.gx-dn-n { fill: #9a9a9a; font-size: 12px; }
+.gx-dn.gx-seen text { fill: #333; }
+.gx-dn.gx-on text { fill: #1A1A1A; font-weight: 700; }
+.gx-dn circle { fill: #DCDCDC; stroke: #a6a6a6; stroke-width: 1.5; transition: fill .3s, stroke .3s; }
+.gx-dn.gx-seen circle { fill: #fff; stroke: #1A1A1A; }
+.gx-dn.gx-on circle { fill: #1A1A1A; stroke: #1A1A1A; }
+.gx-de { fill: none; stroke-width: 1.5; opacity: .35; transition: opacity .3s, stroke-width .3s; }
+.gx-de.gx-out { stroke-width: 2.5; opacity: 1; }
+.gx-de.gx-hot { stroke-width: 5; }
+.gx-side { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; padding-block: 2px; }
+.gx-side-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.gx-path { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+/* Fill only: Firefox draws seams through bordered pills when Reveal scales the slide */
+.gx-step { box-sizing: border-box; height: 24px; padding: 4px 11px; border-radius: 12px; background: #ececec; font-size: 13px; line-height: 16px; white-space: nowrap; }
+.gx-step.gx-last { background: #1A1A1A; color: #fff; font-weight: 600; }
+.gx-step.gx-hint { height: auto; padding-left: 0; background: none; color: #474747; white-space: normal; }
+.gx-tally { display: flex; align-items: baseline; gap: 6px; }
+.gx-count { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.gx-count-sub { font-size: 14px; color: #474747; }
+
+@keyframes gx-pulse { 0% { transform: scale(.75); opacity: .7; } 100% { transform: scale(1.3); opacity: 0; } }
+@keyframes gx-pop { from { opacity: 0; transform: translateY(-8px) scale(.6); } to { opacity: 1; transform: none; } }
+@keyframes gx-flash { 0%, 30% { opacity: .2; } 15%, 45% { opacity: 1; } 100% { opacity: 1; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .gx-halo { animation: none; opacity: .4; }
+  .gx-node, .gx-edge, .gx-line, .gx-more, .gx-label { transition: none; }
+  .gx-chip, .gx-tag, .gx-edge.gx-second.gx-new .gx-line { animation: none; }
+}
