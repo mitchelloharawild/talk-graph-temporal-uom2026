@@ -1241,6 +1241,8 @@ tidygraph::tbl_graph(
 ::: {.column width="60%"}
 ### Reconciliation on graphs
 
+Without $\mathbf{S}$, describe the constraints directly.
+
 ::: {.callout-note}
 ## Each disaggregation is a constraint
 
@@ -1355,6 +1357,14 @@ visNetwork(
 :::
 :::
 
+::: {.fragment .fade-in}
+::: {.callout-question}
+## What about much bigger graphs?
+
+Clicking through `r 1 + n_distinct(tourism_regions$State) + nrow(tourism_regions)` tourism series is easy. Real collections have far more.
+:::
+:::
+
 :::
 :::
 
@@ -1400,10 +1410,14 @@ supply_chain <- tribble(
   )
 
 # A table whose rows are revealed one at a time, for building up dimensionality
-fragment_table <- function(data) {
+fragment_table <- function(data, highlight = character()) {
   num <- vapply(data, is.numeric, logical(1L))
+  hl <- names(data) %in% highlight
   row <- function(values, tag, ...) {
-    cells <- Map(\(v, n) tag(if (is.numeric(v)) scales::comma(v) else v, class = if (n) "num"), values, num)
+    cells <- Map(\(v, n, h) tag(
+      if (is.numeric(v)) scales::comma(v) else v,
+      class = paste(c(if (n) "num", if (h) "highlight"), collapse = " ")
+    ), values, num, hl)
     htmltools::tags$tr(..., unname(cells))
   }
   htmltools::tags$table(
@@ -1434,6 +1448,12 @@ Each disaggregating dimension adds useful information.
 * supports decision-making
 
 ::: {.fragment .fade-up}
+Tourism by `Purpose * State` has `r n_keys(tourism_agg)` series.
+
+Adding `Region` gives `r scales::comma((n_distinct(tourism$Purpose) + 1) * (1 + n_distinct(tourism_regions$State) + nrow(tourism_regions)))`.
+:::
+
+::: {.fragment .fade-up}
 ::: {.callout-caution}
 ## The curse of dimensionality
 
@@ -1451,6 +1471,117 @@ The number of series grows exponentially with each dimension.
 
 ## {}
 
+```{r}
+#| include: false
+# Series per dimension-graph node: each node is a combination of keys
+tourism_dims <- tibble(
+  id = 1:6,
+  dims = c("Total", "Purpose", "State", "Purpose × State", "State / Region", "Purpose ×\nState / Region"),
+  n = c(1, n_distinct(tourism$Purpose), n_distinct(tourism$State),
+        n_distinct(tourism$Purpose) * n_distinct(tourism$State), nrow(tourism_regions),
+        n_distinct(tourism$Purpose) * nrow(tourism_regions)),
+  # Hasse diagram: Purpose steps go down-left, State / Region steps down-right
+  purpose = c(0, 1, 0, 1, 0, 1),
+  state = c(0, 0, 1, 1, 2, 2),
+  x = (state - purpose) * 190,
+  y = (state + purpose) * 150
+)
+# Each edge adds one key: a 2-chain (Purpose) crossed with a 3-chain (State / Region)
+visnetwork_dims <- function(nodes) {
+  visNetwork(
+    nodes, tibble(from = c(1, 1, 2, 3, 3, 4, 5), to = c(2, 3, 4, 4, 5, 6, 6)),
+    width = 740, height = 560
+  ) |>
+    visPhysics(enabled = FALSE) |>
+    visEdges(width = 3, smooth = FALSE, arrows = "to", color = deck_colours[["grey"]]) |>
+    visNodes(font = c(graph_font, size = 24)) |>
+    visInteraction(dragView = FALSE, zoomView = FALSE)
+}
+```
+
+::: columns
+::: {.column width="57%"}
+:::
+::: {.column width="43%"}
+### The dimension graph
+
+::: {.callout-note}
+## A graph of dimensions
+
+Nodes are combinations of keys, not series.
+
+Each edge disaggregates by one more key.
+:::
+
+::: {.fragment .fade-in}
+Tourism has `r nrow(tourism_dims)` nodes, but `r scales::comma(sum(tourism_dims$n))` series.
+:::
+
+:::
+:::
+
+::: {.figure-left}
+::: {.figure-band}
+Purpose * (State / Region)
+:::
+
+```{r}
+tourism_dims |>
+  transmute(id, x, y, label = dims) |>
+  visnetwork_dims() |>
+  visNodes(
+    shape = "box", margin = 12, borderWidth = 2,
+    color = list(background = "white", border = deck_colours[["ink"]])
+  )
+```
+:::
+
+
+## {}
+
+::: columns
+::: {.column width="57%"}
+:::
+::: {.column width="43%"}
+### The dimension graph
+
+::: {.callout-tip}
+## Visualising features
+
+Node size shows the number of series.
+:::
+
+::: {.fragment .fade-in}
+`r scales::comma(tourism_dims$n[6])` of the `r scales::comma(sum(tourism_dims$n))` series sit in the deepest node.
+:::
+
+::: {.fragment .fade-in}
+Any summary of a node's series can be shown this way, e.g. zeros, noise or forecast accuracy.
+:::
+
+:::
+:::
+
+::: {.figure-left}
+::: {.figure-band}
+Purpose * (State / Region)
+:::
+
+```{r}
+# Area proportional to the number of series
+tourism_dims |>
+  transmute(id, x, y, label = paste0(dims, "\n", scales::comma(n), " series"), value = sqrt(n)) |>
+  visnetwork_dims() |>
+  visNodes(
+    shape = "dot", color = deck_colours[["ink"]],
+    scaling = list(min = 6, max = 70)
+  )
+```
+:::
+
+
+## {}
+
 ### Breadth vs depth
 
 Hierarchical: a global supply chain, disaggregated by location.
@@ -1458,7 +1589,7 @@ Hierarchical: a global supply chain, disaggregated by location.
 ```{r}
 supply_chain_hierarchy |>
   relocate(`Total series`, .after = `New series`) |>
-  fragment_table()
+  fragment_table(highlight = "Total series")
 ```
 
 ::: {.fragment .fade-up}
@@ -1475,7 +1606,7 @@ Grouped: the same supply chain, crossed with every other dimension.
 ```{r}
 supply_chain |>
   select(Dimension, Levels, Count = l, `New series`, `Total series`) |>
-  fragment_table()
+  fragment_table(highlight = "Total series")
 ```
 
 ::: {.fragment .fade-up}
@@ -1509,6 +1640,10 @@ deviceCategory\*(continent/subContinent/country)
 :::
 
 gives `r scales::comma(n_keys(fpp3_complete_agg_ts))` time series.
+
+::: {.fragment .fade-up}
+Too many to click through: let's walk the graph.
+:::
 
 :::
 :::
@@ -1553,6 +1688,8 @@ Large structures are dominated by *deeply disaggregated* series.
 ## Model misspecification at scale
 
 Deeply disaggregated series are hard to forecast accurately, and can worsen reconciliation.
+
+MinT's $\mathbf{W}_h$ is estimated from every series' errors.
 :::
 :::
 
@@ -1596,6 +1733,8 @@ Removing uninformative series gives
 Made possible by **graph reconciliation**.
 
 Removing series breaks grouped coherency, so the relevant constraints must also be removed.
+
+The result is an unbalanced graph, with different bottom series.
 :::
 :::
 
@@ -1913,7 +2052,7 @@ The same grouped supply chain, pruned to at most 3 dimensions deep.
 ```{r}
 supply_chain |>
   select(Dimension, Count = l, Complete = `Total series`, Pruned = `Pruned series`) |>
-  fragment_table()
+  fragment_table(highlight = "Pruned")
 ```
 
 ::: {.fragment .fade-up}

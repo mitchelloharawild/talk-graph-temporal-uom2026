@@ -361,6 +361,11 @@ details {
   font-variant-numeric: tabular-nums;
 }
 
+.reveal table.fragment-table .highlight {
+  color: $deck-navy;
+  font-weight: 600;
+}
+
 /* Figure panels take the place of a side photo: the graph walk's grey panel,
    with an optional monospace band (.figure-band) for the structure's formula.
    Pair with a 57% spacer + 43% text column (or 43% text column alone). */
