@@ -1311,20 +1311,149 @@ No top or bottom series needed, and equivalent to MinT for hierarchical or group
 
 ## {}
 
+```{r}
+#| include: false
+tourism_regions <- tourism |>
+  as_tibble() |>
+  distinct(State, Region)
+# One node per series, with an edge wherever a child fixes one more key
+series_graph <- function(data, spec) {
+  agg <- aggregate_key(data, !!enexpr(spec))
+  keys <- as_tibble(agg) |>
+    distinct(across(all_of(key_vars(agg)))) |>
+    mutate(across(everything(), \(x) if_else(is_aggregated(x), "", as.character(x))))
+  m <- as.matrix(keys)
+  # Total first, so it can root the tree layouts
+  m <- m[order(rowSums(m != "")), , drop = FALSE]
+  differ <- Reduce(`+`, map(seq_len(ncol(m)), \(j) outer(m[, j], m[, j], `!=`)))
+  depth <- rowSums(m != "")
+  edges <- which(differ == 1 & outer(depth, depth, \(p, c) c == p + 1), arr.ind = TRUE)
+  # Label each series by its most specific key
+  label <- apply(m, 1, \(r) if (all(r == "")) "Australia" else last(r[r != ""]))
+  visNetwork(
+    tibble(id = seq_len(nrow(m)), label = label, color = level_colours[depth + 1]),
+    tibble(from = edges[, 1], to = edges[, 2]),
+    width = 740, height = 600
+  ) |>
+    visOptions(highlightNearest = list(enabled = TRUE, degree = list(from = 50000, to = 0), hover = FALSE)) |>
+    visNodes(size = 10, font = c(graph_font, size = 14)) |>
+    visEdges(arrows = "to")
+}
+```
+
 ::: columns
 ::: {.column width="57%"}
 :::
 ::: {.column width="43%"}
 ### Exploring data with graphs
 
-Graphs give us a vocabulary for navigating structured time series.
+Graphs show the structure of the data.
 
-::: {.callout-tip}
-## Graph vocabulary
+::: {.callout-note}
+## One node per series
 
-* parents, children, ancestors and descendants
-* depth, leaves and roots
-* subgraphs, paths and graph search
+Each edge disaggregates a series.
+
+::: {.fragment fragment-index=1}
+Nesting regions within states deepens the tree.
+:::
+:::
+
+::: {.fragment .fade-up fragment-index=2}
+::: {.callout-caution}
+## Too many series
+
+Crossing with purpose gives `r scales::comma((n_distinct(tourism$Purpose) + 1) * (1 + n_distinct(tourism_regions$State) + nrow(tourism_regions)))` series.
+
+The structure is lost in the tangle.
+:::
+:::
+
+:::
+:::
+
+::: {.figure-left .fragment .fade-out fragment-index=1}
+::: {.figure-band}
+State
+:::
+
+```{r}
+series_graph(tourism, State) |>
+  visIgraphLayout(layout = "layout_as_tree", circular = TRUE, root = 1)
+```
+:::
+
+::: {.figure-left .fragment .fade-in-then-out fragment-index=1}
+::: {.figure-band}
+State / Region
+:::
+
+```{r}
+series_graph(tourism, State / Region) |>
+  visIgraphLayout(layout = "layout_as_tree", circular = TRUE, root = 1)
+```
+:::
+
+::: {.figure-left .fragment .fade-in fragment-index=2}
+::: {.figure-band}
+Purpose * (State / Region)
+:::
+
+```{r}
+series_graph(tourism, Purpose * (State / Region)) |>
+  visIgraphLayout(layout = "layout_with_kk", randomSeed = 1) |>
+  visNodes(size = 14, font = list(size = 0)) |>
+  visEdges(color = list(color = deck_colours[["grey"]], opacity = 0.4))
+```
+:::
+
+
+## {}
+
+```{r}
+#| include: false
+# Series per dimension-graph node: each node is a combination of keys
+tourism_dims <- tibble(
+  id = 1:6,
+  dims = c("Total", "Purpose", "State", "Purpose × State", "State / Region", "Purpose ×\nState / Region"),
+  n = c(1, n_distinct(tourism$Purpose), n_distinct(tourism$State),
+        n_distinct(tourism$Purpose) * n_distinct(tourism$State), nrow(tourism_regions),
+        n_distinct(tourism$Purpose) * nrow(tourism_regions)),
+  # Hasse diagram: Purpose steps go down-left, State / Region steps down-right
+  purpose = c(0, 1, 0, 1, 0, 1),
+  state = c(0, 0, 1, 1, 2, 2),
+  x = (state - purpose) * 190,
+  y = (state + purpose) * 150
+)
+# Each edge adds one key: a 2-chain (Purpose) crossed with a 3-chain (State / Region)
+visnetwork_dims <- function(nodes) {
+  visNetwork(
+    nodes, tibble(from = c(1, 1, 2, 3, 3, 4, 5), to = c(2, 3, 4, 4, 5, 6, 6)),
+    width = 740, height = 560
+  ) |>
+    visPhysics(enabled = FALSE) |>
+    visEdges(width = 3, smooth = FALSE, arrows = "to", color = deck_colours[["grey"]]) |>
+    visNodes(font = c(graph_font, size = 24)) |>
+    visInteraction(dragView = FALSE, zoomView = FALSE)
+}
+```
+
+::: columns
+::: {.column width="57%"}
+:::
+::: {.column width="43%"}
+### The dimension graph
+
+::: {.callout-note}
+## A graph of dimensions
+
+Nodes are combinations of keys, not series.
+
+Each edge disaggregates by one more key.
+:::
+
+::: {.fragment .fade-in}
+Tourism has `r nrow(tourism_dims)` nodes, but `r scales::comma(sum(tourism_dims$n))` series.
 :::
 
 :::
@@ -1332,31 +1461,85 @@ Graphs give us a vocabulary for navigating structured time series.
 
 ::: {.figure-left}
 ::: {.figure-band}
-State / Region
+Purpose * (State / Region)
 :::
 
 ```{r}
-tourism_regions <- tourism |>
-  as_tibble() |>
-  distinct(State, Region)
-visNetwork(
-  nodes = tibble(
-    id = seq_len(1 + n_distinct(tourism_regions$State) + nrow(tourism_regions)),
-    label = c("Australia", unique(tourism_regions$State), tourism_regions$Region),
-    color = rep(level_colours[1:3], c(1, n_distinct(tourism_regions$State), nrow(tourism_regions)))
-  ),
-  edges = tibble(
-    from = c(rep(1, n_distinct(tourism_regions$State)), 1 + match(tourism_regions$State, unique(tourism_regions$State))),
-    to = 1 + seq_len(n_distinct(tourism_regions$State) + nrow(tourism_regions))
-  ),
-  width = 740, height = 600
-) |>
-  visIgraphLayout(layout = "layout_as_tree", circular = TRUE, root = 1) |>
-  visOptions(highlightNearest = list(enabled = TRUE, degree = list(from = 50000, to = 0), hover = FALSE)) |>
-  visNodes(size = 10, font = c(graph_font, size = 14)) |>
-  visEdges(arrows = "to")
+tourism_dims |>
+  transmute(id, x, y, label = dims) |>
+  visnetwork_dims() |>
+  visNodes(
+    shape = "box", margin = 12, borderWidth = 2,
+    color = list(background = "white", border = deck_colours[["ink"]])
+  )
 ```
 :::
+
+
+## {}
+
+::: columns
+::: {.column width="57%"}
+:::
+::: {.column width="43%"}
+### The dimension graph
+
+::: {.callout-tip}
+## Visualising features
+
+Node fill shows the number of series.
+:::
+
+::: {.fragment .fade-in}
+`r scales::comma(tourism_dims$n[6])` of the `r scales::comma(sum(tourism_dims$n))` series sit in the deepest node.
+:::
+
+::: {.fragment .fade-in}
+Any summary of a node's series can be shown this way, e.g. zeros, noise or forecast accuracy.
+:::
+
+:::
+:::
+
+::: {.figure-left}
+::: {.figure-band}
+Purpose * (State / Region)
+:::
+
+```{r}
+# Fill darkens with the number of series, on a log scale
+series_fill <- scales::col_numeric(c(deck_colours[["panel"]], level_colours[[2]]), domain = NULL)
+tourism_dims |>
+  transmute(
+    id, x, y, label = paste0(dims, "\n", scales::comma(n), " series"),
+    color.background = series_fill(log(n)), color.border = deck_colours[["ink"]],
+    font.color = if_else(log(n) > log(max(n)) / 2, "white", deck_colours[["ink"]])
+  ) |>
+  visnetwork_dims() |>
+  visNodes(shape = "box", margin = 12, borderWidth = 2)
+```
+:::
+
+
+## {}
+
+```{r}
+tourism |>
+  # Trips are recorded in thousands
+  aggregate_key(Purpose * (State / Region), Trips = sum(Trips) * 1e3) |>
+  graph_explore(
+    Trips,
+    Purpose * (State / Region),
+    labels = state_abbreviations,
+    script = list(
+      State ~ Total,
+      Region ~ State == "Victoria",
+      Purpose ~ Total,
+      State ~ Purpose == "Holiday",
+      Purpose ~ State == "Victoria"
+    )
+  )
+```
 
 
 ## {.fragment-remove}
@@ -1393,7 +1576,7 @@ visNetwork(
 ::: {.callout-question}
 ## What about much bigger graphs?
 
-Clicking through `r 1 + n_distinct(tourism_regions$State) + nrow(tourism_regions)` tourism series is easy. Real collections have far more.
+Clicking through `r scales::comma(sum(tourism_dims$n))` tourism series is easy. Real collections have far more.
 :::
 :::
 
@@ -1499,117 +1682,6 @@ The number of series grows exponentially with each dimension.
 :::
 
 ![](backgrounds/arno-senoner-ynvV5b4zZM0-unsplash.jpg){.image-right}
-
-
-## {}
-
-```{r}
-#| include: false
-# Series per dimension-graph node: each node is a combination of keys
-tourism_dims <- tibble(
-  id = 1:6,
-  dims = c("Total", "Purpose", "State", "Purpose × State", "State / Region", "Purpose ×\nState / Region"),
-  n = c(1, n_distinct(tourism$Purpose), n_distinct(tourism$State),
-        n_distinct(tourism$Purpose) * n_distinct(tourism$State), nrow(tourism_regions),
-        n_distinct(tourism$Purpose) * nrow(tourism_regions)),
-  # Hasse diagram: Purpose steps go down-left, State / Region steps down-right
-  purpose = c(0, 1, 0, 1, 0, 1),
-  state = c(0, 0, 1, 1, 2, 2),
-  x = (state - purpose) * 190,
-  y = (state + purpose) * 150
-)
-# Each edge adds one key: a 2-chain (Purpose) crossed with a 3-chain (State / Region)
-visnetwork_dims <- function(nodes) {
-  visNetwork(
-    nodes, tibble(from = c(1, 1, 2, 3, 3, 4, 5), to = c(2, 3, 4, 4, 5, 6, 6)),
-    width = 740, height = 560
-  ) |>
-    visPhysics(enabled = FALSE) |>
-    visEdges(width = 3, smooth = FALSE, arrows = "to", color = deck_colours[["grey"]]) |>
-    visNodes(font = c(graph_font, size = 24)) |>
-    visInteraction(dragView = FALSE, zoomView = FALSE)
-}
-```
-
-::: columns
-::: {.column width="57%"}
-:::
-::: {.column width="43%"}
-### The dimension graph
-
-::: {.callout-note}
-## A graph of dimensions
-
-Nodes are combinations of keys, not series.
-
-Each edge disaggregates by one more key.
-:::
-
-::: {.fragment .fade-in}
-Tourism has `r nrow(tourism_dims)` nodes, but `r scales::comma(sum(tourism_dims$n))` series.
-:::
-
-:::
-:::
-
-::: {.figure-left}
-::: {.figure-band}
-Purpose * (State / Region)
-:::
-
-```{r}
-tourism_dims |>
-  transmute(id, x, y, label = dims) |>
-  visnetwork_dims() |>
-  visNodes(
-    shape = "box", margin = 12, borderWidth = 2,
-    color = list(background = "white", border = deck_colours[["ink"]])
-  )
-```
-:::
-
-
-## {}
-
-::: columns
-::: {.column width="57%"}
-:::
-::: {.column width="43%"}
-### The dimension graph
-
-::: {.callout-tip}
-## Visualising features
-
-Node size shows the number of series.
-:::
-
-::: {.fragment .fade-in}
-`r scales::comma(tourism_dims$n[6])` of the `r scales::comma(sum(tourism_dims$n))` series sit in the deepest node.
-:::
-
-::: {.fragment .fade-in}
-Any summary of a node's series can be shown this way, e.g. zeros, noise or forecast accuracy.
-:::
-
-:::
-:::
-
-::: {.figure-left}
-::: {.figure-band}
-Purpose * (State / Region)
-:::
-
-```{r}
-# Area proportional to the number of series
-tourism_dims |>
-  transmute(id, x, y, label = paste0(dims, "\n", scales::comma(n), " series"), value = sqrt(n)) |>
-  visnetwork_dims() |>
-  visNodes(
-    shape = "dot", color = deck_colours[["ink"]],
-    scaling = list(min = 6, max = 70)
-  )
-```
-:::
 
 
 ## {}
