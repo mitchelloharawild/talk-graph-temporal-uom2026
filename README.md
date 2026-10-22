@@ -30,20 +30,20 @@ Forecasting in practice rarely involves a single time series. Organisations fore
 
 * The basics of forecast reconciliation
 * Hierarchical and grouped coherence
+* Temporal coherence
 * Graph coherence
+* Unbalanced graphs (mixed frequencies, multiple measurement approaches)
 * Disjoint graphs (cross-validation, incomplete reconciliation)
-* Unbalanced trees
-* Data exploration with graphs
 * Forecast reconciliation on graphs
+* Data exploration with graphs
 
 > Pruning graphs (~20 minutes)
 
 * The curse of dimensionality in reconciliation: large scale and inaccurate
 * Introduction to the fpp3 pageviews data
-* Accuracy of incoherent vs coherent forecasts at various depths
 * Visually traversing the graph: sparse and noisy series
-* Feature-based pruning of coherency constraints using graph search
-* Improved computational complexity and forecast accuracy
+* Feature-based pruning of coherency constraints using graph search (fpp3)
+* Results on Favorita grocery sales: accuracy at depth, pruned accuracy, and computation
 * Opportunities for more dimensions of disaggregation
 
 > Future work and questions (~10 minutes)

@@ -8,3 +8,4 @@ index_files
 /.quarto/
 **/*.quarto_ipynb
 /_site/
+fpp3_complete_raw.csv

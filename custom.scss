@@ -223,12 +223,19 @@ span.term {
 }
 
 
-.hierarchy-grid {
+/* Animated graph walks fill the whole letterboxed slide (see resources/graph-walk) */
+.graph-walk, .graph-recap {
   @include full-screen;
-  display: grid;
-  grid-template-columns: 41fr 24fr;
-  grid-template-rows: 0.25fr 1.75fr;
-  gap: 0px 0px;
+  left: -$border-leftright-width;
+  z-index: 0;
+}
+
+/* Fragments that only step a graph walk, so they take no space */
+.graph-walk-step {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
 }
 
 .image-full {
@@ -236,32 +243,6 @@ span.term {
   left: -$border-leftright-width;
   width: $slide-width !important;
   max-width: $slide-width !important;
-}
-
-.hierarchy-symbolic {
-  grid-column: auto / span 2;
-  align-content: center;
-  text-align: center;
-  font-family: monospace;
-  background: #BFBFBF;
-}
-.hierarchy-symbolic span {
-  font-weight: bold;
-}
-.hierarchy-plot {
-  text-align: center;
-}
-.hierarchy-graph {
-  background: #E5E5E5;
-}
-
-.hierarchy-grid > div {
-  padding: 0 25px;
-}
-
-/* Keep the symbolic structure clear of the sticker in the top right */
-.hierarchy-grid > .hierarchy-symbolic {
-  padding-right: 170px;
 }
 
 .inline-img {

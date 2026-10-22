@@ -29,6 +29,8 @@ library(fable)
 library(ggtime)
 # Prototype graph pruning, from mitchelloharawild/paper-graph-pruning
 source("R/prune.R")
+# Animated graph walks that explain pruning
+source("R/graph-walk.R")
 options(width = 75)
 
 # Node colours by depth, shared by every graph in the talk
@@ -109,23 +111,10 @@ fpp3_pruned_ts <- fpp3_complete_ts |>
   )
 rm(fpp3_complete_ts)
 
-# Series shown when traversing the graph, one disaggregation at a time
-fpp3_level <- function(l, .country = "France") {
-  switch(l,
-    Total = fpp3_complete_agg_ts |>
-      filter(if_all(c(deviceCategory, continent, subContinent, country), is_aggregated)),
-    continent = fpp3_complete_agg_ts |>
-      filter(!is_aggregated(continent), if_all(c(deviceCategory, subContinent, country), is_aggregated)),
-    subContinent = fpp3_complete_agg_ts |>
-      filter(continent == "Europe", !is_aggregated(subContinent), if_all(c(deviceCategory, country), is_aggregated)),
-    country = fpp3_complete_agg_ts |>
-      filter(subContinent == "Western Europe", !is_aggregated(country), is_aggregated(deviceCategory)),
-    deviceCategory = fpp3_complete_agg_ts |>
-      filter(country == .country, !is_aggregated(deviceCategory))
-  )
-}
-fpp3_lvls <- c("Total", "continent", "subContinent", "country", "deviceCategory")
-fpp3_colours <- set_names(level_colours, fpp3_lvls)
+# The walks also show an illustrative smart tv series under Western Europe,
+# which isn't in this extract of the data
+fpp3_walk_ts <- fpp3_complete_agg_ts |>
+  add_example_series(deviceCategory = "smart tv", continent = "Europe", subContinent = "Western Europe")
 
 # Favorita results use their own colours, so they don't read as graph levels.
 # Forecasting stages share a colour wherever they appear (accuracy and compute plots)
@@ -135,41 +124,6 @@ result_colours <- c(
   "Pruning" = "grey20", "Coherency structure" = "grey50",
   RMSSE = "#0072B2", sCRPS = "#CC79A7"
 )
-
-fpp3_plot <- function(k, .country = "France") {
-  facets <- intersect(c("continent", "subContinent", "country", "deviceCategory"), fpp3_lvls[seq_len(k)])
-  fpp3_level(fpp3_lvls[k], .country) |>
-    mutate(across(all_of(facets), as.character)) |>
-    ggplot(aes(x = date, y = activeUsers)) +
-    geom_line() +
-    facet_grid(if (length(facets)) vars(!!!syms(facets)) else vars("Total"), scales = "free_y") +
-    theme_minimal()
-}
-
-# The traversed graph, with labels optionally highlighted by an illustrative pruning predicate
-fpp3_graph <- function(k, highlight = NULL, .country = "France") {
-  lvls <- fpp3_lvls[seq_len(k)]
-  parents <- c(continent = "Total", subContinent = "Europe", country = "Western Europe", deviceCategory = .country)
-  labels <- map(lvls, function(l) {
-    if (l == "Total") return("Total")
-    as.character(unique(fpp3_level(l, .country)[[l]]))
-  })
-  nodes <- tibble(
-    label = unlist(labels),
-    color = rep(fpp3_colours[lvls], lengths(labels))
-  )
-  if (!is.null(highlight)) nodes$font.background <- highlight
-  edges <- map(seq_along(lvls)[-1], function(i) {
-    tibble(
-      from = match(parents[[lvls[i]]], nodes$label),
-      to = sum(lengths(labels)[seq_len(i - 1)]) + seq_along(labels[[i]])
-    )
-  }) |>
-    list_rbind()
-  if (!nrow(edges)) edges <- tibble(from = numeric(), to = numeric())
-  tidygraph::tbl_graph(nodes = nodes, edges = edges) |>
-    visnetwork_hierarchy(width = 480, height = 650)
-}
 ```
 
 ##
@@ -1506,131 +1460,23 @@ gives `r scales::comma(n_keys(fpp3_complete_agg_ts))` time series.
 
 ![](backgrounds/fpp3_front_cover.jpg){.image-right}
 
-
 ## {}
 
-![](resources/fpp3.svg){.sticker-float-right}
+![](resources/fpp3.svg){.sticker-float-right .nostretch}
 
-::: {.hierarchy-grid}
-
-::: {.hierarchy-symbolic}
-deviceCategory\*(continent/subContinent/country)
-:::
-
-::: {.hierarchy-plot}
 ```{r}
-#| fig-height: 7
-#| fig-width: 9
-fpp3_plot(1)
+fpp3_walk_ts |>
+  graph_walk(
+    activeUsers,
+    deviceCategory * (continent / subContinent / country),
+    splits = list(
+      continent ~ Total,
+      subContinent ~ continent == "Europe",
+      country ~ subContinent == "Western Europe",
+      deviceCategory ~ country == "France"
+    )
+  )
 ```
-:::
-
-::: {.hierarchy-graph}
-```{r}
-fpp3_graph(1)
-```
-:::
-:::
-
-## {}
-
-![](resources/fpp3.svg){.sticker-float-right}
-
-::: {.hierarchy-grid}
-
-::: {.hierarchy-symbolic}
-deviceCategory\*([continent]{style="color: #084887;"}/subContinent/country)
-:::
-
-::: {.hierarchy-plot}
-```{r}
-#| fig-height: 7
-#| fig-width: 9
-fpp3_plot(2)
-```
-:::
-
-::: {.hierarchy-graph}
-```{r}
-fpp3_graph(2)
-```
-:::
-:::
-
-## {}
-
-![](resources/fpp3.svg){.sticker-float-right}
-
-::: {.hierarchy-grid}
-
-::: {.hierarchy-symbolic}
-deviceCategory\*([continent]{style="color: #084887;"}/[subContinent]{style="color: #8093f1;"}/country)
-:::
-
-::: {.hierarchy-plot}
-```{r}
-#| fig-height: 7
-#| fig-width: 9
-fpp3_plot(3)
-```
-:::
-
-::: {.hierarchy-graph}
-```{r}
-fpp3_graph(3)
-```
-:::
-:::
-
-## {}
-
-![](resources/fpp3.svg){.sticker-float-right}
-
-::: {.hierarchy-grid}
-
-::: {.hierarchy-symbolic}
-deviceCategory\*([continent]{style="color: #084887;"}/[subContinent]{style="color: #8093f1;"}/[country]{style="color: #fbb13c;"})
-:::
-
-::: {.hierarchy-plot}
-```{r}
-#| fig-height: 7
-#| fig-width: 9
-fpp3_plot(4)
-```
-:::
-
-::: {.hierarchy-graph}
-```{r}
-fpp3_graph(4)
-```
-:::
-:::
-
-## {}
-
-![](resources/fpp3.svg){.sticker-float-right}
-
-::: {.hierarchy-grid}
-
-::: {.hierarchy-symbolic}
-[deviceCategory]{style="color: #B388EB;"}\*([continent]{style="color: #084887;"}/[subContinent]{style="color: #8093f1;"}/[country]{style="color: #fbb13c;"})
-:::
-
-::: {.hierarchy-plot}
-```{r}
-#| fig-height: 7
-#| fig-width: 9
-fpp3_plot(5)
-```
-:::
-
-::: {.hierarchy-graph}
-```{r}
-fpp3_graph(5)
-```
-:::
-:::
 
 
 ## {}
@@ -1766,156 +1612,45 @@ Two decisions:
 
 ![](backgrounds/pexels-shvetsa-5231048.jpg){.image-right}
 
+## {}
+
+![](resources/fpp3.svg){.sticker-float-right .nostretch}
+
+```{r}
+fpp3_walk_ts |>
+  graph_walk(
+    activeUsers,
+    deviceCategory * (continent / subContinent / country),
+    splits = list(
+      continent ~ Total,
+      subContinent ~ continent == "Europe",
+      country ~ subContinent == "Western Europe",
+      deviceCategory ~ subContinent == "Western Europe",
+      deviceCategory ~ subContinent == "Northern Europe"
+    ),
+    .predicate = mean(activeUsers) > 10 & mean(activeUsers == 0) < 0.5,
+    .keep = \(x) mean(x) > 0.5
+  )
+```
+
 
 ## {}
 
-![](resources/fpp3.svg){.sticker-float-right}
+![](resources/fpp3.svg){.sticker-float-right .nostretch}
 
-::: {.hierarchy-grid}
-
-::: {.hierarchy-symbolic}
-deviceCategory\*(continent/subContinent/country)
-:::
-
-::: {.hierarchy-plot}
 ```{r}
-#| fig-height: 7
-#| fig-width: 9
-fpp3_plot(1)
+fpp3_complete_agg_ts |>
+  graph_recap(
+    activeUsers,
+    deviceCategory * (continent / subContinent / country),
+    paths = list(
+      ~ continent / subContinent / country,
+      ~ deviceCategory / continent / subContinent / country
+    ),
+    .predicate = mean(activeUsers) > 10 & mean(activeUsers == 0) < 0.5,
+    .keep = \(x) mean(x) > 0.5
+  )
 ```
-:::
-
-::: {.hierarchy-graph}
-```{r}
-fpp3_graph(1, highlight = "lightgreen")
-```
-:::
-:::
-
-## {}
-
-![](resources/fpp3.svg){.sticker-float-right}
-
-::: {.hierarchy-grid}
-
-::: {.hierarchy-symbolic}
-deviceCategory\*([continent]{style="color: #084887;"}/subContinent/country)
-:::
-
-::: {.hierarchy-plot}
-```{r}
-#| fig-height: 7
-#| fig-width: 9
-fpp3_plot(2)
-```
-:::
-
-::: {.hierarchy-graph}
-```{r}
-fpp3_graph(2, highlight = c("lightgreen", "red", rep("lightgreen", 5)))
-```
-:::
-:::
-
-## {}
-
-![](resources/fpp3.svg){.sticker-float-right}
-
-::: {.hierarchy-grid}
-
-::: {.hierarchy-symbolic}
-deviceCategory\*([continent]{style="color: #084887;"}/[subContinent]{style="color: #8093f1;"}/country)
-:::
-
-::: {.hierarchy-plot}
-```{r}
-#| fig-height: 7
-#| fig-width: 9
-fpp3_plot(3)
-```
-:::
-
-::: {.hierarchy-graph}
-```{r}
-fpp3_graph(3, highlight = c("lightgreen", "red", rep("lightgreen", 9)))
-```
-:::
-:::
-
-## {}
-
-![](resources/fpp3.svg){.sticker-float-right}
-
-::: {.hierarchy-grid}
-
-::: {.hierarchy-symbolic}
-deviceCategory\*([continent]{style="color: #084887;"}/[subContinent]{style="color: #8093f1;"}/[country]{style="color: #fbb13c;"})
-:::
-
-::: {.hierarchy-plot}
-```{r}
-#| fig-height: 7
-#| fig-width: 9
-fpp3_plot(4)
-```
-:::
-
-::: {.hierarchy-graph}
-```{r}
-fpp3_graph(4, highlight = c("lightgreen", "red", rep("lightgreen", 13), rep("red", 3), rep("lightgreen", 2)))
-```
-:::
-:::
-
-## {}
-
-![](resources/fpp3.svg){.sticker-float-right}
-
-::: {.hierarchy-grid}
-
-::: {.hierarchy-symbolic}
-[deviceCategory]{style="color: #B388EB;"}\*([continent]{style="color: #084887;"}/[subContinent]{style="color: #8093f1;"}/[country]{style="color: #fbb13c;"})
-:::
-
-::: {.hierarchy-plot}
-```{r}
-#| fig-height: 7
-#| fig-width: 9
-fpp3_plot(5)
-```
-:::
-
-::: {.hierarchy-graph}
-```{r}
-fpp3_graph(5, highlight = c("lightgreen", "red", rep("lightgreen", 13), rep("red", 3), rep("lightgreen", 4), "red"))
-```
-:::
-:::
-
-## {}
-
-![](resources/fpp3.svg){.sticker-float-right}
-
-::: {.hierarchy-grid}
-
-::: {.hierarchy-symbolic}
-[deviceCategory]{style="color: #B388EB;"}\*([continent]{style="color: #084887;"}/[subContinent]{style="color: #8093f1;"}/[country]{style="color: #fbb13c;"})
-:::
-
-::: {.hierarchy-plot}
-```{r}
-#| fig-height: 7
-#| fig-width: 9
-fpp3_plot(5, .country = "Germany")
-```
-:::
-
-::: {.hierarchy-graph}
-```{r}
-fpp3_graph(5, highlight = c("lightgreen", "red", rep("lightgreen", 13), rep("red", 3), rep("lightgreen", 5)), .country = "Germany")
-```
-:::
-:::
 
 
 ## {}
