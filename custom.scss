@@ -86,6 +86,14 @@ img.sticker-float-right {
   right: -1em;
   z-index: 1;
 }
+/* fpp3 sticker, sitting in the right end of a graph walk's band */
+img.sticker-band {
+  height: 90px;
+  position: absolute;
+  top: -35px;
+  right: -60px;
+  z-index: 1;
+}
 img.sticker-float-left {
   height: 180px;
   position: absolute;
@@ -351,4 +359,56 @@ details {
 .reveal table.fragment-table .num {
   text-align: right;
   font-variant-numeric: tabular-nums;
+}
+
+/* Figure panels take the place of a side photo: the graph walk's grey panel,
+   with an optional monospace band (.figure-band) for the structure's formula.
+   Pair with a 57% spacer + 43% text column (or 43% text column alone). */
+.figure-left, .figure-right {
+  @include full-screen;
+  width: 792px !important;
+  max-width: 792px !important;
+  z-index: 0;
+  box-sizing: border-box;
+  padding: 24px;
+  background: $deck-panel;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+}
+.figure-left {
+  left: -$border-leftright-width;
+  right: auto;
+}
+.figure-right {
+  right: -$border-leftright-width;
+}
+.figure-left:has(> .figure-band), .figure-right:has(> .figure-band) {
+  padding-top: 124px;
+}
+.figure-band {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 100px;
+  background: $deck-band;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: monospace;
+  font-size: 24px;
+  white-space: pre;
+  text-align: center;
+}
+.figure-left .cell, .figure-right .cell,
+.figure-left .cell-output-display, .figure-right .cell-output-display {
+  margin: 0;
+}
+.figure-left p, .figure-right p {
+  margin: 0;
+  font-size: 24px;
+  color: $deck-grey;
 }

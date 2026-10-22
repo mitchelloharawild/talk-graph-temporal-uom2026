@@ -316,149 +316,24 @@ One row per series, one column per model specification.
 
 Forecasts for every series and model.
 :::
+:::
 
+::: {.fragment .fade-in-then-out fragment-index=3}
 ![](media/fable/fable-table-hilo.svg){width="90%" fig-align="center"}
+:::
+
+::: {.fragment .fade-up fragment-index=4}
+::: {.callout-question}
+## How are the series related?
+
+Collections have structure: totals, and the parts that add up to them.
+:::
 :::
 
 :::
 :::
 
 ![](backgrounds/yoksel-zok-aEMEMsBNqeo-unsplash.jpg){.image-left}
-
-
-## {auto-animate=true}
-
-::: columns
-::: {.column width="40%"}
-:::
-::: {.column width="60%"}
-
-### Forecasting many related series
-
-```{r}
-options(width = 60, pillar.print_max = 5, pillar.print_min = 5)
-```
-
-```{r}
-#| echo: true
-tourism_agg <- tourism |>
-  aggregate_key(Purpose * State, Trips = sum(Trips))
-tourism_agg
-```
-
-:::
-:::
-
-![](backgrounds/sander-weeteling-KABfjuSOx74-unsplash.jpg){.image-left}
-
-
-## {auto-animate=true}
-
-::: columns
-::: {.column width="40%"}
-:::
-::: {.column width="60%"}
-
-### Forecasting many related series
-
-```{r}
-#| echo: true
-fit <- tourism_agg |>
-  filter_index(~ "2015 Q4") |>
-  model(ets = ETS(Trips)) |>
-  mutate(mint = reconcile_mint(ets))
-fit
-```
-
-::: {.fragment .fade-up}
-One row per series, one column per model.
-
-`reconcile_mint()` makes the forecasts coherent (more on this soon).
-:::
-
-:::
-:::
-
-![](backgrounds/sander-weeteling-KABfjuSOx74-unsplash.jpg){.image-left}
-
-
-## {auto-animate=true}
-
-::: columns
-::: {.column width="40%"}
-:::
-::: {.column width="60%"}
-
-### Forecasting many related series
-
-```{r}
-#| echo: true
-#| fig-height: 2.8
-#| fig-width: 7
-fc <- fit |> forecast(h = "2 years")
-fc |>
-  filter(is_aggregated(Purpose), is_aggregated(State)) |>
-  autoplot(tourism_agg |> filter_index("2010 Q1" ~ .), level = 95)
-```
-
-```{r}
-#| echo: true
-accuracy(fc, tourism_agg) |>
-  summarise(RMSSE = mean(RMSSE), .by = .model) |>
-  as.data.frame()
-```
-
-:::
-:::
-
-![](backgrounds/sander-weeteling-KABfjuSOx74-unsplash.jpg){.image-left}
-
-
-## {.fragment-remove}
-
-::: columns
-::: {.column width="60%"}
-
-### The structure lives in the key
-
-`aggregate_key()` produces every implied aggregate.
-
-::: {.fragment .fade-out fragment-index=1}
-```{r}
-#| echo: true
-class(tourism_agg$State)
-```
-:::
-
-::: {.fragment .fade-up fragment-index=1}
-Keys are vectors of nodes in a graph.
-:::
-
-::: {.fragment .fade-in-then-out fragment-index=1}
-```{r}
-#| echo: true
-keys <- distinct(tourism_agg, Purpose, State)
-graphvec::edges(
-  graphvec::agg_df(
-    Purpose = keys$Purpose, State = keys$State
-  )
-) |>
-  head(5)
-```
-:::
-
-::: {.fragment .fade-up fragment-index=2}
-::: {.callout-question}
-## Why did reconciliation improve accuracy?
-
-And how should we represent these relationships, especially as collections become large and irregular?
-:::
-:::
-
-:::
-:::
-
-![](backgrounds/sander-weeteling-KABfjuSOx74-unsplash.jpg){.image-right}
 
 
 <!-- ====================================================================== -->
@@ -612,23 +487,15 @@ Let's instead consider **graphs**.
 ## {}
 
 ::: columns
-::: {.column width="40%"}
+::: {.column width="57%"}
 :::
-::: {.column width="60%"}
+::: {.column width="43%"}
 ### Hierarchical coherence
 
 ::: {.callout-note}
 ## Each aggregate has a single constraint
 
-The basic constraint is [**hierarchical**]{.term}
-
-```{r}
-tidygraph::tbl_graph(
-  nodes = tibble(label = c("Visitors", "Interstate", "International")),
-  edges = tibble(from = c(1, 1), to = c(2, 3))
-) |>
-  visnetwork_hierarchy(width = 600, height = 250)
-```
+The basic constraint is [**hierarchical**]{.term}.
 
 The edges correspond to the $\mathbf{S}$ matrix.
 :::
@@ -636,60 +503,66 @@ The edges correspond to the $\mathbf{S}$ matrix.
 :::
 :::
 
-![](backgrounds/PXL_20230626_200731948.jpg){.image-left}
+::: {.figure-left}
+::: {.figure-band}
+Origin
+:::
+
+```{r}
+tidygraph::tbl_graph(
+  nodes = tibble(label = c("Visitors", "Interstate", "International")),
+  edges = tibble(from = c(1, 1), to = c(2, 3))
+) |>
+  visnetwork_hierarchy(width = 700, height = 400)
+```
+:::
 
 
 ## {}
 
 ::: columns
-::: {.column width="40%"}
+::: {.column width="57%"}
 :::
-::: {.column width="60%"}
+::: {.column width="43%"}
 ### Hierarchical coherence
 
 ::: {.callout-note}
 ## Each aggregate has a single constraint
 
-[**Hierarchical**]{.term} series often have multiple layers
+[**Hierarchical**]{.term} series often have multiple layers.
+:::
+
+::: {.fragment .fade-in}
+In graph terms, this is a [**polytree**]{.term}.
+:::
+
+:::
+:::
+
+::: {.figure-left}
+::: {.figure-band}
+Origin / State
+:::
 
 ```{r}
 tidygraph::tbl_graph(
   nodes = tibble(label = c("Visitors", "Interstate", "International", "NSW", "QLD", "Other states")),
   edges = tibble(from = c(1, 1, 2, 2, 2), to = c(2, 3, 4, 5, 6))
 ) |>
-  visnetwork_hierarchy(width = 600, height = 400)
+  visnetwork_hierarchy(width = 700, height = 560)
 ```
-
-::: {.fragment .fade-in}
-In graph terms, this is a [**polytree**]{.term}.
 :::
-:::
-
-:::
-:::
-
-![](backgrounds/PXL_20230626_200731948.jpg){.image-left}
 
 
 ## {}
 
 ::: columns
-::: {.column width="60%"}
+::: {.column width="43%"}
 ### Grouped coherence
 
 There are many ways to disaggregate a series.
 
-Consider why visitors travel, for a **holiday** or **business**?
-
-::: {.fragment .fade-in}
-```{r}
-tidygraph::tbl_graph(
-  nodes = tibble(label = c("Visitors", "Holiday", "Business")),
-  edges = tibble(from = c(1, 1), to = c(2, 3))
-) |>
-  visnetwork_hierarchy(width = 600, height = 250)
-```
-:::
+Why do visitors travel: for a **holiday** or **business**?
 
 ::: {.fragment .fade-in}
 ::: {.callout-question}
@@ -702,13 +575,27 @@ Let's consider the combinations.
 :::
 :::
 
-![](backgrounds/zach-callahan--i51Ke0ROTo-unsplash.jpg){.image-right}
+::: {.figure-right}
+::: {.figure-band}
+Purpose
+:::
+
+::: {.fragment .fade-in}
+```{r}
+tidygraph::tbl_graph(
+  nodes = tibble(label = c("Visitors", "Holiday", "Business")),
+  edges = tibble(from = c(1, 1), to = c(2, 3))
+) |>
+  visnetwork_hierarchy(width = 700, height = 400)
+```
+:::
+:::
 
 
 ## {}
 
 ::: columns
-::: {.column width="60%"}
+::: {.column width="43%"}
 ### Grouped coherence
 
 ::: {.callout-note}
@@ -716,40 +603,41 @@ Let's consider the combinations.
 
 Disaggregate by one, then further by the other.
 
-::: columns
-::: {.column width="50%"}
+A [**grouped**]{.term} structure has the same top and bottom series.
+:::
+
+:::
+:::
+
+::: {.figure-right}
+::: {.figure-band}
+Origin / Purpose  and  Purpose / Origin
+:::
+
 ```{r}
 tidygraph::tbl_graph(
   nodes = tibble(label = c("Visitors", "Interstate", "International", "Interstate\n& Holiday", "Interstate\n& Business", "International\n& Holiday", "International\n& Business")),
   edges = tibble(from = c(1, 1, 2, 2, 3, 3), to = c(2, 3, 4, 5, 6, 7))
 ) |>
-  visnetwork_hierarchy(width = 300, height = 400)
+  visnetwork_hierarchy(width = 740, height = 300) |>
+  visNodes(font = list(size = 22))
 ```
-:::
-::: {.column width="50%"}
+
 ```{r}
 tidygraph::tbl_graph(
   nodes = tibble(label = c("Visitors", "Holiday", "Business", "Holiday\n& Interstate", "Holiday\n& International", "Business\n& Interstate", "Business\n& International")),
   edges = tibble(from = c(1, 1, 2, 2, 3, 3), to = c(2, 3, 4, 5, 6, 7))
 ) |>
-  visnetwork_hierarchy(width = 300, height = 400)
+  visnetwork_hierarchy(width = 740, height = 300) |>
+  visNodes(font = list(size = 22))
 ```
 :::
-:::
-
-A [**grouped**]{.term} structure has the same top and bottom series.
-
-:::
-:::
-:::
-
-![](backgrounds/zach-callahan--i51Ke0ROTo-unsplash.jpg){.image-right}
 
 
 ## {}
 
 ::: columns
-::: {.column width="60%"}
+::: {.column width="43%"}
 ### Grouped coherence
 
 ::: {.callout-note}
@@ -757,48 +645,153 @@ A [**grouped**]{.term} structure has the same top and bottom series.
 
 The [**grouped**]{.term} structure can be drawn as a single graph.
 
+Edge colours show the [origin]{style="color: #1B998B;"} and [purpose]{style="color: #C33C8A;"} constraints.
+:::
+
+::: {.fragment .fade-in}
+In graph terms, this is a [**directed acyclic graph**]{.term} (DAG).
+:::
+
+:::
+:::
+
+::: {.figure-right}
+::: {.figure-band}
+Origin * Purpose
+:::
+
 ```{r}
 tidygraph::tbl_graph(
   nodes = tibble(label = c("Visitors", "Interstate", "International", "Holiday", "Business", "Interstate\n& Holiday", "Interstate\n& Business", "International\n& Holiday", "International\n& Business")),
   edges = tibble(
     from  = c(1, 1, 1, 1, 2, 4, 2, 5, 3, 4, 3, 5),
     to    = c(2, 3, 4, 5, 6, 6, 7, 7, 8, 8, 9, 9),
-    color = hcl.colors(3, "Dark2")[c(1,1,2,2,1,2,1,2,1,2,1,2)]
+    color = constraint_colours[c(1,1,2,2,1,2,1,2,1,2,1,2)]
   )
 ) |>
-  visnetwork_graph(width = 600, height = 400)
+  visnetwork_graph(width = 740, height = 560)
+```
+:::
+
+
+## {auto-animate=true}
+
+### Grouped coherence in software
+
+Australian tourism, by purpose of travel and state.
+
+```{r}
+options(width = 90, pillar.print_max = 5, pillar.print_min = 5)
 ```
 
-::: {.fragment .fade-in}
-In graph terms, this is a [**directed acyclic graph**]{.term} (DAG).
+```{r}
+#| echo: true
+tourism_agg <- tourism |>
+  aggregate_key(Purpose * State, Trips = sum(Trips))
+tourism_agg
+```
+
+
+## {auto-animate=true}
+
+### Grouped coherence in software
+
+```{r}
+#| echo: true
+fit <- tourism_agg |>
+  filter_index(~ "2015 Q4") |>
+  model(ets = ETS(Trips)) |>
+  mutate(mint = reconcile_mint(ets))
+fit
+```
+
+::: {.fragment .fade-up}
+One row per series, one column per model.
+
+`reconcile_mint()` makes the forecasts coherent.
+:::
+
+
+## {auto-animate=true}
+
+### Grouped coherence in software
+
+```{r}
+#| echo: true
+#| fig-height: 3
+#| fig-width: 12
+#| out-width: 100%
+fc <- fit |> forecast(h = "2 years")
+fc |>
+  filter(is_aggregated(Purpose), is_aggregated(State)) |>
+  autoplot(tourism_agg |> filter_index("2010 Q1" ~ .), level = 95)
+```
+
+```{r}
+#| echo: true
+accuracy(fc, tourism_agg) |>
+  summarise(RMSSE = mean(RMSSE), .by = .model) |>
+  as.data.frame()
+```
+
+
+## {.fragment-remove}
+
+::: columns
+::: {.column width="60%"}
+
+### The structure lives in the key
+
+`aggregate_key()` produces every implied aggregate.
+
+::: {.fragment .fade-out fragment-index=1}
+```{r}
+#| echo: true
+class(tourism_agg$State)
+```
+:::
+
+::: {.fragment .fade-up fragment-index=1}
+Keys are vectors of nodes in a graph.
+:::
+
+::: {.fragment .fade-in-then-out fragment-index=1}
+```{r}
+#| echo: true
+keys <- distinct(tourism_agg, Purpose, State)
+graphvec::edges(
+  graphvec::agg_df(
+    Purpose = keys$Purpose, State = keys$State
+  )
+) |>
+  head(5)
+```
+:::
+
+::: {.fragment .fade-up fragment-index=2}
+::: {.callout-question}
+## What about time?
+
+Series can also be disaggregated by their time index.
 :::
 :::
 
 :::
 :::
 
-![](backgrounds/zach-callahan--i51Ke0ROTo-unsplash.jpg){.image-right}
+![](backgrounds/sander-weeteling-KABfjuSOx74-unsplash.jpg){.image-right}
 
 
 ## {}
 
 ::: columns
-::: {.column width="40%"}
+::: {.column width="57%"}
 :::
-::: {.column width="60%"}
+::: {.column width="43%"}
 ### Temporal coherence
 
 ::: {.callout-note}
-A time series can be disaggregated by temporal granularity
-
-```{r}
-tidygraph::tbl_graph(
-  nodes = tibble(label = c("Year", "Q1", "Q2", "Q3", "Q4", month.abb)),
-  edges = tibble(from = c(rep(1, 4), rep(2:5, each = 3)), to = c(2:17))
-) |>
-  visnetwork_hierarchy(width = 700, height = 200) |>
-  visNodes(font = list(size = 40))
-```
+A time series can be disaggregated by temporal granularity.
 :::
 
 ::: {.callout-paper}
@@ -814,37 +807,35 @@ A [**polytree**]{.term}, so this structure is [**hierarchical**]{.term}...
 :::
 :::
 :::
+
 :::
 :::
 
-![](backgrounds/courtney-smith-pCLKkPHpCz0-unsplash.jpg){.image-left}
-
-
-## {}
-
-::: columns
-::: {.column width="40%"}
+::: {.figure-left}
+::: {.figure-band}
+year(1L) / quarter(1L) / month(1L)
 :::
-::: {.column width="60%"}
-### Temporal coherence
 
 ```{r}
 tidygraph::tbl_graph(
   nodes = tibble(label = c("Year", "Q1", "Q2", "Q3", "Q4", month.abb)),
   edges = tibble(from = c(rep(1, 4), rep(2:5, each = 3)), to = c(2:17))
 ) |>
-  visnetwork_hierarchy(width = 700, height = 200) |>
-  visNodes(font = list(size = 40))
+  visnetwork_hierarchy(width = 740, height = 400) |>
+  visNodes(font = list(size = 30))
 ```
+:::
 
-```{r}
-tidygraph::tbl_graph(
-  nodes = tibble(label = c("Year", "Jan-Apr", "May-Aug", "Sep-Dec", month.abb)),
-  edges = tibble(from = c(rep(1, 3), rep(2:4, each = 4)), to = c(2:16))
-) |>
-  visnetwork_hierarchy(width = 700, height = 200) |>
-  visNodes(font = list(size = 40))
-```
+
+## {}
+
+::: columns
+::: {.column width="57%"}
+:::
+::: {.column width="43%"}
+### Temporal coherence
+
+Other granularities disaggregate the same year.
 
 ::: {.fragment .fade-in}
 ::: {.callout-question}
@@ -854,36 +845,49 @@ Same top and bottom series, so temporal coherence is [**grouped**]{.term}.
 :::
 :::
 :::
+
 :::
 :::
 
-![](backgrounds/courtney-smith-pCLKkPHpCz0-unsplash.jpg){.image-left}
+::: {.figure-left}
+::: {.figure-band}
+year(1L) / quarter(1L) / month(1L)\
+and\
+year(1L) / month(4L) / month(1L)
+:::
+
+```{r}
+tidygraph::tbl_graph(
+  nodes = tibble(label = c("Year", "Q1", "Q2", "Q3", "Q4", month.abb)),
+  edges = tibble(from = c(rep(1, 4), rep(2:5, each = 3)), to = c(2:17))
+) |>
+  visnetwork_hierarchy(width = 740, height = 300) |>
+  visNodes(font = list(size = 30))
+```
+
+```{r}
+tidygraph::tbl_graph(
+  nodes = tibble(label = c("Year", "Jan-Apr", "May-Aug", "Sep-Dec", month.abb)),
+  edges = tibble(from = c(rep(1, 3), rep(2:4, each = 4)), to = c(2:16))
+) |>
+  visnetwork_hierarchy(width = 740, height = 300) |>
+  visNodes(font = list(size = 30))
+```
+:::
 
 
 ## {}
 
 ::: columns
-::: {.column width="40%"}
+::: {.column width="57%"}
 :::
-::: {.column width="60%"}
+::: {.column width="43%"}
 ### Temporal coherence
 
 ::: {.callout-tip}
 ## Temporal coherence is a DAG
 
-```{r}
-tidygraph::tbl_graph(
-  nodes = tibble(label = c("Year", "Q1", "Q2", "Q3", "Q4", "Jan-Apr", "May-Aug", "Sep-Dec", month.abb)),
-  edges = tibble(
-    from = c(rep(1, 7), rep(2:5, each = 3), rep(6:8, each = 4)),
-    to = c(2:8, 9:20, 9:20),
-    grp = c(rep(1, 4), rep(2, 3), rep(1, 12), rep(2, 12)),
-    color = hcl.colors(3, "Dark2")[grp]
-  )
-) |>
-  visnetwork_graph(width = 700, height = 450) |>
-  visNodes(font = list(size = 30))
-```
+Edge colours show the [quarterly]{style="color: #1B998B;"} and [four-monthly]{style="color: #C33C8A;"} constraints.
 :::
 
 ::: {.fragment .fade-in}
@@ -893,24 +897,36 @@ Cross-sectional and temporal DAGs combine into a single [**cross-temporal**]{.te
 :::
 :::
 
-![](backgrounds/courtney-smith-pCLKkPHpCz0-unsplash.jpg){.image-left}
+::: {.figure-left}
+::: {.figure-band}
+year(1L) / (quarter(1L) * month(4L)) / month(1L)
+:::
+
+```{r}
+tidygraph::tbl_graph(
+  nodes = tibble(label = c("Year", "Q1", "Q2", "Q3", "Q4", "Jan-Apr", "May-Aug", "Sep-Dec", month.abb)),
+  edges = tibble(
+    from = c(rep(1, 7), rep(2:5, each = 3), rep(6:8, each = 4)),
+    to = c(2:8, 9:20, 9:20),
+    grp = c(rep(1, 4), rep(2, 3), rep(1, 12), rep(2, 12)),
+    color = constraint_colours[grp]
+  )
+) |>
+  visnetwork_graph(width = 740, height = 560) |>
+  visNodes(font = list(size = 26))
+```
+:::
 
 
 ## {}
 
-::: columns
-::: {.column width="40%"}
-:::
-::: {.column width="60%"}
-
 ### Temporal coherence in software
 
-Time is a dimension of disaggregation too.
-
-Melbourne pedestrians, by day, month and year:
+`aggregate_index()` does the same for time: Melbourne pedestrians, by day, month and year.
 
 ```{r}
 #| echo: true
+#| output-location: column
 #| R.options: !expr list(pillar.print_min = 3, pillar.print_max = 3)
 pedestrian |>
   filter(Sensor == "Southern Cross Station") |>
@@ -928,11 +944,6 @@ pedestrian |>
 Temporal aggregates are keyed by their `.granule`.
 :::
 :::
-
-:::
-:::
-
-![](backgrounds/courtney-smith-pCLKkPHpCz0-unsplash.jpg){.image-left}
 
 
 ## {}
@@ -989,22 +1000,33 @@ This often occurs with:
 ![](backgrounds/peter-law-2fU_lyraUOA-unsplash.jpg){.image-left}
 
 
-## {auto-animate=true}
+## {}
 
 ::: columns
-::: {.column width="40%"}
+::: {.column width="57%"}
 :::
-::: {.column width="60%"}
-
+::: {.column width="43%"}
 ### Unbalanced graphs
 
 1. Series observed at **different temporal granularities**
 
-::: {.callout-tip}
+::: {.callout-note}
 ## Example
 `Sales` is reported quarterly, but `Profit` and `Costs` twice yearly.
+:::
 
-:::{data-id="graphtemp"}
+::: {.fragment .fade-in}
+Higher frequency `Sales` data informs the less frequent `Profit` and `Costs`.
+:::
+
+:::
+:::
+
+::: {.figure-left}
+::: {.figure-band}
+Profit = Sales + -Costs
+:::
+
 ```{r}
 tidygraph::tbl_graph(
   nodes = tibble(label = c("Profit (Y)", "Sales (Y)", "-Costs (Y)", "Profit (S1)", "Sales (S1)", "-Costs (S1)", "Profit (S2)", "Sales (S2)", "-Costs (S2)", "Sales (Q1)","Sales (Q2)","Sales (Q3)","Sales (Q4)")),
@@ -1012,22 +1034,13 @@ tidygraph::tbl_graph(
     from  = c(1, 1, 4, 4, 7, 7,    1, 1, 2, 2, 3, 3,   5, 5, 8, 8),
     to    = c(2, 3, 5, 6, 8, 9,    4, 7, 5, 8, 6, 9,   10, 11, 12, 13),
     grp   = c(1, 1, 1, 1, 1, 1,    2, 2, 2, 2, 2, 2,   3,  3,  3,  3),
-    color = hcl.colors(3, "Dark2")[grp]
+    color = constraint_colours[grp]
   )
 ) |>
-  visnetwork_graph(width = 600, height = 300) |>
-  visNodes(font = list(size = 25))
+  visnetwork_graph(width = 740, height = 560) |>
+  visNodes(font = list(size = 26))
 ```
 :::
-
-::: {.fragment .fade-in}
-Higher frequency `Sales` data informs the less frequent `Profit` and `Costs`.
-:::
-:::
-:::
-:::
-
-![](backgrounds/peter-law-2fU_lyraUOA-unsplash.jpg){.image-left}
 
 
 ## {}
@@ -1041,7 +1054,7 @@ Higher frequency `Sales` data informs the less frequent `Profit` and `Costs`.
 
 2. **Different approaches** to calculating the top series
 
-::: {.callout-tip}
+::: {.callout-note}
 ## Example
 
 Australian GDP is calculated with 3 approaches:
@@ -1066,17 +1079,29 @@ This example is used in @Athanasopoulos2020.
 ## {}
 
 ::: columns
-::: {.column width="40%"}
+::: {.column width="57%"}
 :::
-::: {.column width="60%"}
-
+::: {.column width="43%"}
 ### Unbalanced graphs
 
 2. **Different approaches** to calculating the top series
 
-::: {.callout-tip}
+::: {.callout-note}
+## Example
+
+Two approaches to calculating GDP:
 
 * Income approach (I)
+* Expenditure approach (E)
+:::
+
+:::
+:::
+
+::: {.figure-left}
+::: {.figure-band}
+GDP = I  and  GDP = E
+:::
 
 ```{r}
 aus_gdp_struct <- tribble(
@@ -1093,10 +1118,8 @@ tidygraph::tbl_graph(
     filter(!is.na(parent)) |>
     rename(from = parent, to = code)
 ) |>
-  visnetwork_hierarchy(width = 600, height = 200)
+  visnetwork_hierarchy(width = 740, height = 290)
 ```
-
-* Expenditure approach (E)
 
 ```{r}
 aus_gdp_struct <- tribble(
@@ -1113,30 +1136,38 @@ tidygraph::tbl_graph(
     filter(!is.na(parent)) |>
     rename(from = parent, to = code)
 ) |>
-  visnetwork_hierarchy(width = 600, height = 200)
+  visnetwork_hierarchy(width = 740, height = 290)
 ```
-
 :::
-:::
-:::
-
-![](backgrounds/peter-law-2fU_lyraUOA-unsplash.jpg){.image-left}
 
 
 ## {}
 
 ::: columns
-::: {.column width="40%"}
+::: {.column width="57%"}
 :::
-::: {.column width="60%"}
-
+::: {.column width="43%"}
 ### Unbalanced graphs
 
 2. **Different approaches** to calculating the top series
 
-::: {.callout-tip}
+::: {.callout-note}
+## Combined approach
 
-* Combined approach (I & E)
+Two constraints on GDP, from the [income]{style="color: #1B998B;"} and [expenditure]{style="color: #C33C8A;"} approaches.
+:::
+
+::: {.fragment .fade-in}
+No common bottom series means no $\mathbf{S}$ matrix.
+:::
+
+:::
+:::
+
+::: {.figure-left}
+::: {.figure-band}
+GDP = I = E
+:::
 
 ```{r}
 aus_gdp_struct <- tribble(
@@ -1152,56 +1183,56 @@ tidygraph::tbl_graph(
     mutate(across(everything(), ~ match(., code))) |>
     filter(!is.na(parent)) |>
     rename(from = parent, to = code) |>
-    mutate(color = hcl.colors(3, "Dark2")[c(rep(1, 3), rep(2, 4))])
+    mutate(color = constraint_colours[c(rep(1, 3), rep(2, 4))])
 ) |>
-  visnetwork_graph(layout = "layout_as_tree", layout_args = list(root = 1, flip.y = FALSE), width = 650, height = 330)
+  visnetwork_graph(width = 740, height = 420) |>
+  visNodes(font = list(size = 20))
 ```
-
-Two constraints on GDP, with no common bottom series.
 :::
-:::
-:::
-
-![](backgrounds/peter-law-2fU_lyraUOA-unsplash.jpg){.image-left}
 
 
 ## {}
 
 ::: columns
-::: {.column width="60%"}
+::: {.column width="43%"}
 ### Disjoint graphs
 
 What if there are **multiple top series**?
 
-::: {.fragment .fade-in}
+::: {.fragment .fade-in fragment-index=1}
 This occurs with:
 
-1. cross-validation with reconciliation
+1. cross-validation
 2. partial coherency (e.g. no worldwide total)
 :::
 
-::: {.fragment .fade-in}
-::: {.callout-tip}
+::: {.fragment .fade-in fragment-index=2}
+::: {.callout-note}
 ## Cross-validation
 
-It makes no sense to aggregate folds of cross-validation.
+Folds can't be aggregated, so each disjoint graph is reconciled separately.
+:::
+:::
 
+:::
+:::
+
+::: {.figure-right}
+::: {.figure-band}
+Origin, by fold
+:::
+
+::: {.fragment .fade-in fragment-index=2}
 ```{r}
 tidygraph::tbl_graph(
   nodes = tibble(label = paste0(c("Visitors", "Interstate", "International"), "\n(fold ", rep(1:3, each = 3), ")")),
   edges = tibble(from = c(1, 1, 4, 4, 7, 7), to = c(2, 3, 5, 6, 8, 9))
 ) |>
-  visnetwork_graph(width = 600, height = 170)
+  visnetwork_graph(width = 740, height = 400) |>
+  visNodes(font = list(size = 26))
 ```
-
-Each disjoint graph is reconciled separately.
 :::
 :::
-
-:::
-:::
-
-![](backgrounds/firosnv-photography-Rr3B0LH7W3k-unsplash.jpg){.image-right}
 
 
 ## {}
@@ -1244,19 +1275,31 @@ Equivalent to MinT when the graph is hierarchical or grouped.
 ![](backgrounds/eilis-garvey-MskbR8VLNrA-unsplash.jpg){.image-right}
 
 
-## {.fragment-remove}
+## {}
 
 ::: columns
-::: {.column width="40%"}
+::: {.column width="57%"}
 :::
-::: {.column width="60%"}
+::: {.column width="43%"}
 ### Exploring data with graphs
 
 Graphs give us a vocabulary for navigating structured time series.
 
-::: {.fragment .fade-out fragment-index=1}
-::: {.callout-note}
-## Australian tourism by state and region
+::: {.callout-tip}
+## Graph vocabulary
+
+* parents, children, ancestors and descendants
+* depth, leaves and roots
+* subgraphs, paths and graph search
+:::
+
+:::
+:::
+
+::: {.figure-left}
+::: {.figure-band}
+State / Region
+:::
 
 ```{r}
 tourism_regions <- tourism |>
@@ -1272,32 +1315,14 @@ visNetwork(
     from = c(rep(1, n_distinct(tourism_regions$State)), 1 + match(tourism_regions$State, unique(tourism_regions$State))),
     to = 1 + seq_len(n_distinct(tourism_regions$State) + nrow(tourism_regions))
   ),
-  width = 700, height = 420
+  width = 740, height = 600
 ) |>
   visIgraphLayout(layout = "layout_as_tree", circular = TRUE, root = 1) |>
   visOptions(highlightNearest = list(enabled = TRUE, degree = list(from = 50000, to = 0), hover = FALSE)) |>
-  visNodes(size = 10, font = list(size = 14)) |>
+  visNodes(size = 10, font = c(graph_font, size = 14)) |>
   visEdges(arrows = "to")
 ```
-
-Click a node to highlight its descendants.
 :::
-:::
-
-::: {.fragment .fade-in fragment-index=1}
-::: {.callout-tip}
-## Graph vocabulary
-
-* parents, children, ancestors and descendants
-* depth, leaves and roots
-* subgraphs, paths and graph search
-:::
-:::
-
-:::
-:::
-
-![](backgrounds/aleksandar-radovanovic-mXKXJI98aTE-unsplash.jpg){.image-left}
 
 
 ## {.fragment-remove}
@@ -1492,7 +1517,7 @@ gives `r scales::comma(n_keys(fpp3_complete_agg_ts))` time series.
 
 ## {}
 
-![](resources/fpp3.svg){.sticker-float-right .nostretch}
+![](resources/fpp3.svg){.sticker-band .nostretch}
 
 ```{r}
 fpp3_walk_ts |>
@@ -1644,7 +1669,7 @@ Two decisions:
 
 ## {}
 
-![](resources/fpp3.svg){.sticker-float-right .nostretch}
+![](resources/fpp3.svg){.sticker-band .nostretch}
 
 ```{r}
 fpp3_walk_ts |>
@@ -1666,7 +1691,7 @@ fpp3_walk_ts |>
 
 ## {}
 
-![](resources/fpp3.svg){.sticker-float-right .nostretch}
+![](resources/fpp3.svg){.sticker-band .nostretch}
 
 ```{r}
 fpp3_complete_agg_ts |>
@@ -1685,10 +1710,10 @@ fpp3_complete_agg_ts |>
 
 ## {}
 
-::: columns
-::: {.column width="65%"}
-
 ### Pruning pageviews
+
+::: columns
+::: {.column width="68%"}
 
 ```{r}
 #| echo: true
@@ -1702,6 +1727,9 @@ pageviews |>
     activeUsers = sum(activeUsers)
   )
 ```
+
+:::
+::: {.column width="32%"}
 
 ```{r}
 series_depth <- function(x) {
@@ -1721,13 +1749,12 @@ full_join(
   gt() |>
   cols_label(depth = "Depth") |>
   fmt_number(decimals = 0) |>
-  tab_options(table.font.size = 22)
+  tab_options(table.font.size = 26) |>
+  tab_style(cell_text(color = "#084887", weight = 600), cells_body(columns = Pruned))
 ```
 
 :::
 :::
-
-![](backgrounds/pexels-shvetsa-5231048.jpg){.image-right}
 
 
 <!-- ---------------------------------------------------------------------- -->
@@ -1814,14 +1841,12 @@ With poor weights, MinT (OLS, off the chart) reaches an RMSSE of `r favorita_dep
 
 ## {}
 
-::: columns
-::: {.column width="60%"}
-
 ### Pruned reconciliation
 
 ```{r}
-#| fig-width: 7.5
-#| fig-height: 4.5
+#| fig-width: 12
+#| fig-height: 4.2
+#| out-width: 100%
 read_csv("data/favorita-prune.csv", show_col_types = FALSE) |>
   pivot_longer(c(rmsse_complete, rmsse_pruned, scrps_complete, scrps_pruned), names_to = c("metric", "arm"), names_sep = "_") |>
   group_by(rule, metric) |>
@@ -1835,9 +1860,7 @@ read_csv("data/favorita-prune.csv", show_col_types = FALSE) |>
   scale_x_log10(labels = scales::comma) +
   scale_y_continuous(labels = scales::percent) +
   scale_colour_manual(values = result_colours) +
-  labs(x = "Series retained (of 361,311)", y = "Pruned / complete MinT (WLS)", colour = NULL) +
-  theme_minimal(base_size = 18) +
-  theme(legend.position = "top")
+  labs(x = "Series retained (of 361,311)", y = "Pruned / complete MinT (WLS)", colour = NULL)
 ```
 
 ::: {.fragment .fade-up}
@@ -1848,46 +1871,32 @@ With >1,500 series kept, pruning wins on both accuracy measures.
 :::
 :::
 
-:::
-:::
-
-![](backgrounds/firosnv-photography-Rr3B0LH7W3k-unsplash.jpg){.image-right}
-
 
 ## {}
-
-::: columns
-::: {.column width="60%"}
 
 ### Pruned reconciliation
 
 ```{r}
-#| fig-width: 7.5
-#| fig-height: 4.5
+#| fig-width: 12
+#| fig-height: 4.6
+#| out-width: 100%
 read_csv("data/favorita-compute.csv", show_col_types = FALSE) |>
   mutate(stage = fct_inorder(stage)) |>
   ggplot(aes(x = seconds / 3600, y = fct_rev(arm), fill = stage)) +
   geom_col() +
   scale_fill_manual(values = result_colours) +
   labs(x = "Hours (per forecast origin)", y = NULL, fill = NULL) +
-  theme_minimal(base_size = 18) +
-  theme(legend.position = "bottom") +
-  guides(fill = guide_legend(nrow = 3))
+  theme(panel.grid.major.y = element_blank()) +
+  guides(fill = guide_legend(nrow = 1))
 ```
 
 ::: {.fragment .fade-up}
 ::: {.callout-tip}
 ## Less computation
 
-* Reconciliation: ~3 hours → 5 seconds (cut-100)
-* Base forecasts: ~35$\times$ less compute
+Reconciliation: ~3 hours → 5 seconds (cut-100). Base forecasts: ~35$\times$ less compute.
 :::
 :::
-
-:::
-:::
-
-![](backgrounds/firosnv-photography-Rr3B0LH7W3k-unsplash.jpg){.image-right}
 
 
 <!-- ---------------------------------------------------------------------- -->
