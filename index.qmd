@@ -1899,8 +1899,7 @@ supply_chain <- tribble(
 ) |>
   mutate(
     `Total series` = vapply(seq_len(n()), \(x) total_grouped_series(l[seq_len(x)]), double(1L)),
-    `New series` = c(1, diff(`Total series`)),
-    `Pruned series` = vapply(seq_len(n()), \(x) total_grouped_series(l[seq_len(x)], depth = pmin(x, 3)), double(1L))
+    `New series` = c(1, diff(`Total series`))
   )
 
 # A table whose rows are revealed one at a time, for building up dimensionality.
@@ -2835,23 +2834,6 @@ By about `r scales::percent(mean(filter(favorita_skill, reference == "vs reconci
 <!-- ---------------------------------------------------------------------- -->
 <!-- Opportunity: more dimensions                                           -->
 <!-- ---------------------------------------------------------------------- -->
-
-
-## {}
-
-### Pruning the supply chain
-
-The same grouped supply chain, pruned to at most 3 dimensions deep.
-
-```{r}
-supply_chain |>
-  select(Dimension, Count = l, Complete = `Total series`, Pruned = `Pruned series`) |>
-  fragment_table(highlight = "Pruned")
-```
-
-::: {.fragment .fade-up}
-Every dimension kept, a fraction of the series.
-:::
 
 
 ## {}
