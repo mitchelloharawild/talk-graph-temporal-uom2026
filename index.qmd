@@ -270,7 +270,7 @@ New models and methods slot into the same workflow.
 ::: {.callout-note icon=false}
 ## Probabilistic
 
-Forecast distributions to evaluate, combine and compare.
+Forecast distributions to directly provide uncertainty.
 :::
 :::
 :::
@@ -286,9 +286,9 @@ Forecast distributions to evaluate, combine and compare.
 
 ### A tidy data model for time series
 
-The unit of analysis is the *collection*, not the individual series.
-
 ::: {.fragment .fade-out fragment-index=1}
+The *key* to forecasting many series with fable
+
 ![](media/fable/data-overview.svg){width="100%" fig-align="center"}
 :::
 
@@ -296,7 +296,7 @@ The unit of analysis is the *collection*, not the individual series.
 ::: {.callout-note icon=false}
 ## tsibble
 
-Time **index**, **key** variables identify each series.
+Key variables identify each series.
 :::
 
 ![](media/fable/tsibble.svg){width="70%" fig-align="center"}
@@ -312,21 +312,18 @@ One row per series, one column per model specification.
 ![](media/fable/mable-tint.svg){width="100%" fig-align="center"}
 :::
 
-::: {.fragment .fade-in fragment-index=3}
+::: {.fragment .fade-in-then-out fragment-index=3}
 ::: {.callout-note icon=false}
 ## fable
 
-Forecasts for every series and model.
+Probabilistic forecasts for each series and model.
 :::
-:::
-
-::: {.fragment .fade-in-then-out fragment-index=3}
 ![](media/fable/fable-table-hilo.svg){width="90%" fig-align="center"}
 :::
 
 ::: {.fragment .fade-up fragment-index=4}
-::: {.callout-question}
-## How are the series related?
+::: {.callout-question icon=-false}
+## How are each series related?
 
 Collections have structure: totals, and the parts that add up to them.
 :::
