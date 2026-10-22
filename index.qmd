@@ -33,8 +33,27 @@ source("R/prune.R")
 source("R/graph-walk.R")
 options(width = 75)
 
-# Node colours by depth, shared by every graph in the talk
-level_colours <- c("grey70", "#084887", "#8093f1", "#fbb13c", "#B388EB")
+# Deck palette, mirrored in custom.scss
+deck_colours <- c(ink = "#1A1A1A", grey = "#5E5E5E", panel = "#E5E5E5", band = "#BFBFBF")
+# Node colours by depth, shared by every graph in the talk (hex, as visNetwork
+# doesn't know R colour names like grey70)
+level_colours <- c("#8E8E8E", "#084887", "#8093F1", "#FBB13C", "#B388EB")
+# Edge colours mean "which constraint / disaggregation path"
+constraint_colours <- c("#1B998B", "#C33C8A", "#5E5E5E")
+graph_font <- list(face = "Source Sans Pro", color = deck_colours[["ink"]])
+
+knitr::opts_chunk$set(dev = "svg")
+theme_deck <- function(base_size = 20) {
+  theme_minimal(base_size = base_size, base_family = "Source Sans 3") +
+    theme(
+      legend.position = "top",
+      panel.grid.minor = element_blank(),
+      plot.margin = margin(5, 20, 5, 5),
+      text = element_text(colour = deck_colours[["ink"]]),
+      axis.text = element_text(colour = deck_colours[["grey"]])
+    )
+}
+theme_set(theme_deck())
 # Depth of each node from its nearest root, so disjoint graphs are coloured per component
 graph_level <- function(data) {
   roots <- which(igraph::degree(data, mode = "in") == 0)
@@ -57,23 +76,29 @@ visnetwork_hierarchy <- function(data, ...) {
                       clusterOptions = list(fixed = TRUE, physics = TRUE))
     ) |>
     visEdges(scaling = list(label = list(enabled = FALSE)), arrows = "to") |>
-    visNodes(font = list(size = 16))
+    visNodes(font = c(graph_font, size = 18))
 
   graph$x$tree <- list(updateShape = TRUE, shapeVar = "dot", shapeY = "square")
   graph
 }
-visnetwork_graph <- function(data, layout = "layout_nicely", ..., layout_args = list()) {
+# DAGs are drawn top-down by depth too, so the top series is always at the top
+visnetwork_graph <- function(data, layout = "hierarchical", ..., layout_args = list()) {
   nodes <- as_tibble(mutate(activate(data, "nodes"), id = row_number(), level = graph_level(data))) |>
-    colour_by_level() |>
-    select(-level)
+    colour_by_level()
+  if (layout != "hierarchical") nodes <- select(nodes, -level)
   edges <- as_tibble(activate(data, "edges"))
-  graph <- visNetwork(nodes, edges, ...) |>
-    (\(g) exec(visIgraphLayout, g, layout = layout, randomSeed = 123091238, !!!layout_args))() |>
+  graph <- visNetwork(nodes, edges, ...)
+  graph <- if (layout == "hierarchical") {
+    exec(visHierarchicalLayout, graph, direction = "UD", !!!layout_args)
+  } else {
+    exec(visIgraphLayout, graph, layout = layout, randomSeed = 123091238, !!!layout_args)
+  }
+  graph <- graph |>
     visOptions(
       highlightNearest = list(enabled = TRUE, degree = list(from = 50000, to = 0), hover = FALSE)
     ) |>
-    visEdges(width = 3, scaling = list(label = list(enabled = FALSE)), arrows = "to") |>
-    visNodes(size = 20)
+    visEdges(width = 3, smooth = FALSE, scaling = list(label = list(enabled = FALSE)), arrows = "to") |>
+    visNodes(size = 20, font = c(graph_font, size = 18))
 
   graph$x$tree <- list(updateShape = TRUE, shapeVar = "dot", shapeY = "square")
   graph
@@ -123,6 +148,11 @@ result_colours <- c(
   "Base forecasts (ETS)" = "#D55E00", "Sample paths" = "#E69F00", "Reconcile (MinT WLS)" = "#009E73",
   "Pruning" = "grey20", "Coherency structure" = "grey50",
   RMSSE = "#0072B2", sCRPS = "#CC79A7"
+)
+# Unnamed discrete scales (e.g. autoplot() of ets vs mint) follow the same stages
+options(
+  ggplot2.discrete.colour = unname(result_colours[c("Base forecasts", "MinT (WLS)")]),
+  ggplot2.discrete.fill = unname(result_colours[c("Base forecasts", "MinT (WLS)")])
 )
 ```
 
@@ -1757,9 +1787,7 @@ favorita_depth |>
   geom_point(size = 3) +
   scale_x_continuous(breaks = 0:9) +
   scale_colour_manual(values = result_colours) +
-  labs(x = "Disaggregation depth", y = "RMSSE", colour = NULL) +
-  theme_minimal(base_size = 20) +
-  theme(legend.position = "top")
+  labs(x = "Disaggregation depth", y = "RMSSE", colour = NULL)
 ```
 
 ::: columns
