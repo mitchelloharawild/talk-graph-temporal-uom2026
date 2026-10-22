@@ -609,7 +609,7 @@ A [**grouped**]{.term} structure has the same top and bottom series.
 
 ::: {.figure-right}
 ::: {.figure-band}
-Origin / Purpose  and  Purpose / Origin
+Origin / Purpose and Purpose / Origin
 :::
 
 ```{r}
@@ -1098,7 +1098,7 @@ Two approaches to calculating GDP:
 
 ::: {.figure-left}
 ::: {.figure-band}
-GDP = I  and  GDP = E
+GDP = I and GDP = E
 :::
 
 ```{r}
@@ -1217,7 +1217,7 @@ Folds can't be aggregated, so each disjoint graph is reconciled separately.
 
 ::: {.figure-right}
 ::: {.figure-band}
-Origin, by fold
+0 + Fold / Origin
 :::
 
 ::: {.fragment .fade-in fragment-index=2}

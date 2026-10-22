@@ -405,7 +405,8 @@ details {
   justify-content: center;
   font-family: monospace;
   font-size: 24px;
-  white-space: pre;
+  line-height: 1.2;
+  white-space: nowrap;
   text-align: center;
 }
 .figure-left .cell, .figure-right .cell,
