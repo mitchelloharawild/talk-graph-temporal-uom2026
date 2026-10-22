@@ -1,0 +1,14 @@
+"comparison","strategy","forecasts","n","rmsse","scrps"
+"own","Pruning","Base forecasts",4998,0.7464,0.4839
+"own","Pruning","MinT (WLS)",4998,0.7402,0.4773
+"own","Fewer dimensions","Base forecasts",6951,0.7828,0.5043
+"own","Fewer dimensions","MinT (WLS)",6951,0.7633,0.4888
+"own, first origin","Pruning","Base forecasts",1599,0.7424,0.4669
+"own, first origin","Pruning","Complete graph",1599,0.7563,0.4925
+"own, first origin","Pruning","MinT (WLS)",1599,0.7311,0.4566
+"own, first origin","Fewer dimensions","Base forecasts",2317,0.7804,0.4952
+"own, first origin","Fewer dimensions","Complete graph",2317,0.755,0.5097
+"own, first origin","Fewer dimensions","MinT (WLS)",2317,0.7605,0.4752
+"shared",,"Base forecasts",920,0.6349,0.428
+"shared",,"Fewer dimensions",920,0.5967,0.3918
+"shared",,"Pruning",920,0.6209,0.4078

@@ -1,0 +1,16 @@
+strategy,stage,seconds
+Complete,Choose series and constraints,0.0
+Complete,Base forecasts (ETS),271348.9
+Complete,Sample paths,220352.9
+Complete,Reconcile means,67254.7
+Complete,Reconcile sample paths,233425.7
+Fewer dimensions,Choose series and constraints,0.6
+Fewer dimensions,Base forecasts (ETS),1716.6
+Fewer dimensions,Sample paths,1054.2
+Fewer dimensions,Reconcile means,1.8
+Fewer dimensions,Reconcile sample paths,8.4
+Pruning,Choose series and constraints,5.1
+Pruning,Base forecasts (ETS),2532.6
+Pruning,Sample paths,1151.5
+Pruning,Reconcile means,0.2
+Pruning,Reconcile sample paths,5.2

@@ -2287,28 +2287,36 @@ has a total of...
 
 ```{r}
 #| include: false
-# Series per dimension-graph node, complete and pruned (cut-100, first origin),
-# with the graph's layout, from the Favorita application of mitchelloharawild/paper-graph-pruning
+# Series per dimension-graph node, from the Favorita application of
+# mitchelloharawild/paper-graph-pruning (first forecast origin): every series,
+# the class-state dimension subset, and the cv-040 pruning rule
 favorita_nodes <- read_csv("data/favorita-nodes.csv", show_col_types = FALSE)
 favorita_edges <- read_csv("data/favorita-edges.csv", show_col_types = FALSE)
-# One log scale for both graphs, so a colour means the same count before and after pruning
+# One log scale for every graph, so a colour means the same count in each
 favorita_fill <- scales::col_numeric(
   c(deck_colours[["panel"]], level_colours[[2]]),
   domain = log(range(favorita_nodes$complete)), na.color = "white"
 )
-visnetwork_favorita <- function(n) {
-  favorita_nodes |>
+# `subset` draws only the nodes with series, in their place in the full graph
+visnetwork_favorita <- function(n, width = 744, height = 560, size = 14, subset = FALSE) {
+  nodes <- favorita_nodes |>
     transmute(
-      id = node, x = x * 62, y = -y * 56,
+      id = node, x = x * width / 12, y = -y * height / 10,
       title = paste0(label, "<br>", scales::comma(n), " series"),
       color.background = favorita_fill(if_else(n > 0, log(n), NA)),
-      color.border = deck_colours[["ink"]]
-    ) |>
-    visNetwork(favorita_edges, width = 744, height = 560) |>
+      # Nodes with nothing kept fade into the panel
+      color.border = if_else(n > 0, deck_colours[["ink"]], deck_colours[["band"]])
+    )
+  edges <- favorita_edges
+  if (subset) {
+    nodes <- nodes[n > 0, ]
+    edges <- filter(edges, from %in% nodes$id, to %in% nodes$id)
+  }
+  visNetwork(nodes, edges, width = width, height = height) |>
     visPhysics(enabled = FALSE) |>
     visEdges(width = 1, smooth = FALSE, arrows = list(to = list(scaleFactor = 0.4)),
              color = list(color = deck_colours[["grey"]], opacity = 0.35)) |>
-    visNodes(shape = "dot", size = 14, borderWidth = 1.5, font = list(size = 0)) |>
+    visNodes(shape = "dot", size = size, borderWidth = 1.5, font = list(size = 0)) |>
     visInteraction(dragView = FALSE, zoomView = FALSE, hover = TRUE)
 }
 favorita_legend <- htmltools::div(
@@ -2321,6 +2329,51 @@ favorita_legend <- htmltools::div(
   scales::comma(max(favorita_nodes$complete)),
   "series"
 )
+favorita_n <- c(
+  Complete = sum(favorita_nodes$complete),
+  `Fewer dimensions` = sum(favorita_nodes$dimsub),
+  Pruning = sum(favorita_nodes$pruned)
+)
+# The two strategies are compared throughout, so they keep one colour each
+strategy_colours <- c(
+  "Base forecasts" = result_colours[["Base forecasts"]],
+  "Fewer dimensions" = level_colours[[1]], "Pruning" = level_colours[[2]]
+)
+
+# Compute time per forecast origin (first origin), measured in the paper's
+# pipeline: every series in every node is charged its own measured fitting
+# time, duplicates included; path reconciliation was timed for 200 draws and
+# is scaled to 3,000
+favorita_cost <- read_csv("data/favorita-cost.csv", show_col_types = FALSE) |>
+  mutate(stage = fct_inorder(stage))
+fmt_duration <- function(s) {
+  case_when(
+    s < 1 ~ "<1 s",
+    s < 60 ~ sprintf("%.0f s", s),
+    s < 3600 ~ sprintf("%.0f min", s / 60),
+    TRUE ~ sprintf("%.1f h", s / 3600)
+  )
+}
+cost_total <- favorita_cost |>
+  summarise(seconds = sum(seconds), .by = strategy) |>
+  deframe()
+fmt_days <- function(s) sprintf("~%.0f h ≈ %.0f days", s / 3600, s / 86400)
+
+# Memory of 8-byte numbers for n series: 12 months ahead, 3,000 sample paths,
+# and n x n matrices for reconciling
+fmt_bytes <- scales::label_bytes(units = "auto_si", accuracy = 0.1)
+favorita_memory <- function(n) {
+  c(points = n * 12 * 8, paths = n * 12 * 3000 * 8, diagonal = n^2 * 8, full = 2 * n^2 * 8)
+}
+
+# Scaled accuracy (sample-path sCRPS and RMSSE, lower is better), MinT (WLS)
+favorita_accuracy <- read_csv("data/favorita-accuracy.csv", show_col_types = FALSE)
+acc <- function(comparison, forecasts, strategy = NA, metric = "scrps") {
+  favorita_accuracy |>
+    filter(.data$comparison == !!comparison, .data$forecasts == !!forecasts,
+           is.na(!!strategy) | .data$strategy %in% !!strategy) |>
+    pull(metric)
+}
 ```
 
 ::: columns
@@ -2340,7 +2393,7 @@ Corporación Favorita: product sales across stores and regions of Ecuador.
 :::
 
 * `r nrow(favorita_nodes)` aggregation nodes, up to `r n_distinct(favorita_nodes$y) - 1` levels deep
-* `r scales::comma(sum(favorita_nodes$complete))` time series
+* `r scales::comma(favorita_n[["Complete"]])` time series
 * ETS base forecasts, 12 months ahead, 3 forecast origins
 
 :::
@@ -2362,7 +2415,7 @@ Corporación Favorita: product sales across stores and regions of Ecuador.
 ::: {.callout-tip}
 ## Series per node
 
-`r nrow(favorita_nodes)` nodes, `r scales::comma(sum(favorita_nodes$complete))` series.
+`r nrow(favorita_nodes)` nodes, `r scales::comma(favorita_n[["Complete"]])` series.
 :::
 
 ::: {.fragment .fade-in}
@@ -2386,23 +2439,85 @@ favorita_legend
 
 ## {}
 
+### Forecasting everything: time
+
+All `r scales::comma(favorita_n[["Complete"]])` series, for one forecast origin.
+
+```{r}
+complete_cost <- filter(favorita_cost, strategy == "Complete", seconds > 0)
+tibble(
+  Stage = c(as.character(complete_cost$stage), "Total"),
+  Work = c(
+    paste(scales::comma(favorita_n[["Complete"]]), "models"), "3,000 paths × 12 months",
+    "1.73M constraints", "3,000 draws", "per forecast origin"
+  ),
+  Time = c(fmt_duration(complete_cost$seconds), fmt_days(cost_total[["Complete"]]))
+) |>
+  fragment_table(row_class = c(rep("", nrow(complete_cost)), "total"), right = "Time")
+```
+
+::: {.fragment .fade-up}
+::: {.callout-caution}
+## Only monthly data, one model
+
+Daily data, or choosing between several models, multiplies it.
+:::
+:::
+
+
+## {}
+
+### Forecasting everything: memory
+
+All $n$ = `r scales::comma(favorita_n[["Complete"]])` series, 8 bytes per number.
+
+```{r}
+tibble(
+  `Needed for` = c(
+    "Point forecasts", "Probabilistic forecasts (sample paths)",
+    "Reconciling, diagonal weights", "Reconciling, full weights (shrinkage)"
+  ),
+  `Matrix size` = c("n × 12 months", "n × 12 × 3,000 draws", "n × n projection", "n × n weights + projection"),
+  Memory = fmt_bytes(favorita_memory(favorita_n[["Complete"]]))
+) |>
+  fragment_table(highlight = "Memory", right = "Memory")
+```
+
+::: {.fragment .fade-up}
+So in practice, nobody forecasts all of it.
+:::
+
+
+## {}
+
 ::: columns
 ::: {.column width="57%"}
 :::
 ::: {.column width="43%"}
-### Pruned dimension graph
+### Fewer dimensions
+
+The usual approach: keep every series in a few dimensions.
 
 ::: {.callout-note}
-## Pruned with cut-100
+## `r sum(favorita_nodes$dimsub > 0)` of `r nrow(favorita_nodes)` nodes, `r scales::comma(favorita_n[["Fewer dimensions"]])` series
 
-* predicate: at least 100 sales every month
-* pruning rule: keep if >75% of disaggregates pass
+For each state $s$, store type $t$, cluster $c$ and perishability $p$:
+
+$$
+\begin{aligned}
+y_{\text{Total}} &= \textstyle\sum_{s} y_{s} \\
+y_{s} &= \textstyle\sum_{t,\, c} y_{s,\, t,\, c} \\
+y_{s,\, t,\, c} &= \textstyle\sum_{p} y_{p,\, s,\, t,\, c}
+\end{aligned}
+$$
 :::
 
-::: {.fragment .fade-in}
-`r scales::comma(sum(favorita_nodes$pruned))` of `r scales::comma(sum(favorita_nodes$complete))` series kept.
+::: {.fragment .fade-up}
+::: {.callout-caution}
+## No items, no stores
 
-The deepest nodes are thinned the most.
+No forecasts for any product or any store.
+:::
 :::
 
 :::
@@ -2410,7 +2525,53 @@ The deepest nodes are thinned the most.
 
 ::: {.figure-left}
 ::: {.figure-band}
-(perishable/family/class/item_nbr) \*<br>(((state/city)\*type\*cluster)/store_nbr)
+(perishable/family)\*state\*type\*cluster
+:::
+
+```{r}
+visnetwork_favorita(favorita_nodes$dimsub, subset = TRUE, size = 18)
+favorita_legend
+```
+:::
+
+
+## {}
+
+::: columns
+::: {.column width="57%"}
+:::
+::: {.column width="43%"}
+### Pruning
+
+A similar budget, searched across every dimension.
+
+::: {.callout-note}
+## `r sum(favorita_nodes$pruned > 0)` of `r nrow(favorita_nodes)` nodes, `r scales::comma(favorita_n[["Pruning"]])` series
+
+In Los Rios, deli item $i$ (732007) is split by city, item $j$ (732006) isn't:
+
+$$
+\begin{aligned}
+y_{i,\, \text{LR}} &= y_{i,\, \text{Babahoyo}} + y_{i,\, \text{Quevedo}} \\
+y_{j,\, \text{LR}} &\quad \text{(pruned)}
+\end{aligned}
+$$
+:::
+
+::: {.fragment .fade-up}
+::: {.callout-tip}
+## Every dimension kept
+
+Item and store forecasts, where they are forecastable.
+:::
+:::
+
+:::
+:::
+
+::: {.figure-left}
+::: {.figure-band}
+sd(sales) / mean(sales) ≤ 0.4<br>keep a split if >75% of its series pass
 :::
 
 ```{r}
@@ -2422,107 +2583,251 @@ favorita_legend
 
 ## {}
 
-### Accuracy at depth
-
-```{r}
-#| fig-width: 12
-#| fig-height: 5.2
-#| out-width: 100%
-# Summarised from the Favorita application of mitchelloharawild/paper-graph-pruning
-favorita_depth_all <- read_csv("data/favorita-depth.csv", show_col_types = FALSE)
-favorita_depth <- favorita_depth_all |>
-  filter(series != "ols") |>
-  mutate(series = factor(series,
-    levels = c("fit", "base", "bu", "wls"),
-    labels = c("In-sample fit", "Base forecasts", "Bottom-up", "MinT (WLS)")
-  ))
-favorita_depth |>
-  ggplot(aes(x = depth, y = rmsse, colour = series)) +
-  geom_line(linewidth = 1.2) +
-  geom_point(size = 3) +
-  scale_x_continuous(breaks = 0:9) +
-  scale_colour_manual(values = result_colours) +
-  labs(x = "Disaggregation depth", y = "RMSSE", colour = NULL)
-```
+### Two ways to spend ~6,000 series
 
 ::: columns
 ::: {.column width="50%"}
-::: {.fragment .fade-up}
-::: {.callout-caution}
-## Fits better, forecasts worse
+::: {style="background: #E5E5E5; padding: 12px 16px;"}
+**Fewer dimensions**<br>`r sum(favorita_nodes$dimsub > 0)` of `r nrow(favorita_nodes)` nodes, `r scales::comma(favorita_n[["Fewer dimensions"]])` series
 
-Deep series are overfit, so their base forecasts are poor.
-:::
+```{r}
+visnetwork_favorita(favorita_nodes$dimsub, width = 520, height = 380, size = 11)
+```
 :::
 :::
 ::: {.column width="50%"}
-::: {.fragment .fade-up}
-::: {.callout-important}
-## Misspecification spreads
-
-With poor weights, MinT (OLS, off the chart) reaches an RMSSE of `r favorita_depth_all |> filter(series == "ols", depth == 3) |> pull(rmsse) |> round(1)` at depth 3.
-:::
-:::
-:::
-:::
-
-
-## {}
-
-### Pruned reconciliation
+::: {style="background: #E5E5E5; padding: 12px 16px;"}
+**Pruning**<br>`r sum(favorita_nodes$pruned > 0)` of `r nrow(favorita_nodes)` nodes, `r scales::comma(favorita_n[["Pruning"]])` series
 
 ```{r}
-#| fig-width: 12
-#| fig-height: 4.2
-#| out-width: 100%
-read_csv("data/favorita-prune.csv", show_col_types = FALSE) |>
-  pivot_longer(c(rmsse_complete, rmsse_pruned, scrps_complete, scrps_pruned), names_to = c("metric", "arm"), names_sep = "_") |>
-  group_by(rule, metric) |>
-  mutate(rel = value / value[arm == "complete"]) |>
-  filter(arm == "pruned") |>
-  ungroup() |>
-  mutate(metric = recode(metric, rmsse = "RMSSE", scrps = "sCRPS")) |>
-  ggplot(aes(x = reps, y = rel, colour = metric)) +
-  geom_hline(yintercept = 1, linetype = "dashed", colour = "grey50") +
-  geom_point(size = 4) +
-  scale_x_log10(labels = scales::comma) +
-  scale_y_continuous(labels = scales::percent) +
-  scale_colour_manual(values = result_colours) +
-  labs(x = "Series retained (of 361,311)", y = "Pruned / complete MinT (WLS)", colour = NULL)
+visnetwork_favorita(favorita_nodes$pruned, width = 520, height = 380, size = 11)
+```
+:::
+:::
+:::
+
+```{r}
+favorita_legend
 ```
 
 ::: {.fragment .fade-up}
-::: {.callout-tip}
-## Less can be more
-
-With >1,500 series kept, pruning wins on both accuracy measures.
-:::
+Grouped constraints drop dimensions; graph constraints drop series.
 :::
 
 
 ## {}
 
-### Pruned reconciliation
+### Cost of each strategy: time
+
+One forecast origin.
+
+```{r}
+strategy_cost <- favorita_cost |>
+  filter(strategy != "Complete") |>
+  mutate(seconds = fmt_duration(seconds)) |>
+  pivot_wider(names_from = strategy, values_from = seconds) |>
+  rename(Stage = stage) |>
+  mutate(Stage = as.character(Stage))
+bind_rows(
+  strategy_cost,
+  tibble(Stage = "Total", `Fewer dimensions` = fmt_duration(cost_total[["Fewer dimensions"]]),
+         Pruning = fmt_duration(cost_total[["Pruning"]])),
+  tibble(Stage = "Complete, for comparison", `Fewer dimensions` = fmt_days(cost_total[["Complete"]]), Pruning = NA)
+) |>
+  rename_with(\(x) paste0(x, " (", scales::comma(favorita_n[x]), ")"), c(`Fewer dimensions`, Pruning)) |>
+  (\(d) fragment_table(d, reveal = nrow(d), row_class = c(rep("", nrow(d) - 2), "total", "comparison"), right = names(d)[-1]))()
+```
+
+::: {.callout-tip}
+## Both are feasible
+
+More than `r floor(min(cost_total[["Complete"]] / cost_total[c("Fewer dimensions", "Pruning")]) / 100) * 100`$\times$ cheaper than forecasting everything.
+:::
+
+
+## {}
+
+### Cost of each strategy: memory
+
+8 bytes per number.
+
+```{r}
+memory <- lapply(favorita_n, \(n) {
+  m <- favorita_memory(n)
+  c(m, total = sum(m[c("points", "paths", "full")]))
+})
+tibble(
+  `Needed for` = c(
+    "Point forecasts", "Probabilistic forecasts (sample paths)", "Reconciling, diagonal weights",
+    "Reconciling, full weights (shrinkage)", "Total (with full weights)", "Complete, for comparison"
+  ),
+  `Fewer dimensions` = fmt_bytes(c(memory[["Fewer dimensions"]], memory[["Complete"]][["total"]])),
+  Pruning = c(fmt_bytes(memory[["Pruning"]]), NA)
+) |>
+  rename_with(\(x) paste0(x, " (", scales::comma(favorita_n[x]), ")"), c(`Fewer dimensions`, Pruning)) |>
+  (\(d) fragment_table(d, reveal = nrow(d), row_class = c(rep("", nrow(d) - 2), "total", "comparison"), right = names(d)[-1]))()
+```
+
+::: {.callout-tip}
+## Gigabytes, not terabytes
+
+Full shrinkage weights become feasible again.
+:::
+
+
+## {}
+
+### Which forecasts are more accurate?
+
+Each strategy scored on its own series, lower is better.
 
 ```{r}
 #| fig-width: 12
 #| fig-height: 4.6
 #| out-width: 100%
-read_csv("data/favorita-compute.csv", show_col_types = FALSE) |>
-  mutate(stage = fct_inorder(stage)) |>
-  ggplot(aes(x = seconds / 3600, y = fct_rev(arm), fill = stage)) +
-  geom_col() +
+favorita_accuracy |>
+  filter(comparison == "own") |>
+  ggplot(aes(x = strategy, y = scrps, fill = forecasts)) +
+  geom_col(position = position_dodge(width = 0.8), width = 0.7) +
+  geom_text(aes(label = sprintf("%.3f", scrps)), position = position_dodge(width = 0.8),
+            vjust = -0.4, size = 7) +
   scale_fill_manual(values = result_colours) +
-  labs(x = "Hours (per forecast origin)", y = NULL, fill = NULL) +
-  theme(panel.grid.major.y = element_blank()) +
-  guides(fill = guide_legend(nrow = 1))
+  scale_y_continuous(expand = expansion(mult = c(0, 0.12))) +
+  labs(x = NULL, y = "Scaled CRPS", fill = NULL) +
+  theme(panel.grid.major.x = element_blank(), axis.text.x = element_text(size = 22))
 ```
 
 ::: {.fragment .fade-up}
 ::: {.callout-tip}
-## Less computation
+## Pruned forecasts are slightly more accurate
 
-Reconciliation: ~3 hours → 5 seconds (cut-100). Base forecasts: ~35$\times$ less compute.
+`r scales::percent(1 - acc("own", "Base forecasts", "Pruning") / acc("own", "Base forecasts", "Fewer dimensions"), accuracy = 0.1)` lower sCRPS before reconciling, `r scales::percent(1 - acc("own", "MinT (WLS)", "Pruning") / acc("own", "MinT (WLS)", "Fewer dimensions"), accuracy = 0.1)` after.
+:::
+:::
+
+
+## {}
+
+```{r}
+#| include: false
+n_shared <- favorita_accuracy |> filter(comparison == "shared") |> pull(n) |> first()
+```
+
+::: columns
+::: {.column width="43%"}
+### Not a fair comparison
+
+* Different series: the gap is there *before* reconciling
+* Pruning keeps forecastable series by design
+* Only ~`r round(n_shared / 3, -1)` series in common per origin
+
+::: {.fragment .fade-up}
+::: {.callout-tip}
+## But pruned forecasts are more useful
+
+Item and store forecasts, which is where ordering decisions happen.
+:::
+:::
+
+:::
+:::
+
+::: {.figure-right}
+```{r}
+#| fig-width: 7
+#| fig-height: 4.5
+#| dev.args: !expr list(bg = "transparent")
+favorita_accuracy |>
+  filter(comparison == "own", forecasts == "Base forecasts") |>
+  ggplot(aes(x = scrps, y = fct_rev(strategy), fill = strategy)) +
+  geom_col(width = 0.6) +
+  geom_text(aes(label = sprintf("%.3f", scrps)), hjust = -0.2, size = 7) +
+  scale_fill_manual(values = strategy_colours, guide = "none") +
+  scale_x_continuous(expand = expansion(mult = c(0, 0.2))) +
+  labs(x = "Base forecast sCRPS, before reconciling", y = NULL) +
+  theme(panel.grid.major.y = element_blank(), plot.background = element_rect(fill = NA, colour = NA))
+```
+:::
+
+
+## {}
+
+### Like for like: shared series
+
+`r n_shared` series in both sets over 3 origins, all inside fewer dimensions' `r sum(favorita_nodes$dimsub > 0)` nodes.
+
+```{r}
+#| fig-width: 12
+#| fig-height: 4
+#| out-width: 100%
+favorita_accuracy |>
+  filter(comparison == "shared") |>
+  pivot_longer(c(rmsse, scrps), names_to = "metric") |>
+  mutate(
+    metric = recode(metric, rmsse = "RMSSE", scrps = "sCRPS"),
+    forecasts = fct_inorder(forecasts)
+  ) |>
+  ggplot(aes(x = forecasts, y = value, fill = forecasts)) +
+  geom_col(width = 0.7) +
+  geom_text(aes(label = sprintf("%.3f", value)), vjust = -0.4, size = 7) +
+  facet_wrap(vars(metric), scales = "free_y") +
+  scale_fill_manual(values = strategy_colours, guide = "none") +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.15))) +
+  labs(x = NULL, y = NULL) +
+  theme(panel.grid.major.x = element_blank(), strip.text = element_text(size = 22))
+```
+
+::: {.fragment .fade-up}
+::: {.callout-note}
+## Fewer dimensions' home ground
+
+It reconciles the shared aggregates better. Pruning's gains come from the series only it keeps.
+:::
+:::
+
+
+## {}
+
+```{r}
+#| include: false
+# Skill: 1 - mean(strategy) / mean(reference), on each strategy's own series at
+# the first origin, the only one with complete-graph sample paths
+favorita_skill <- favorita_accuracy |>
+  filter(comparison == "own, first origin") |>
+  select(strategy, forecasts, scrps) |>
+  pivot_wider(names_from = forecasts, values_from = scrps) |>
+  transmute(
+    strategy,
+    `vs base forecasts` = 1 - `MinT (WLS)` / `Base forecasts`,
+    `vs reconciling everything` = 1 - `MinT (WLS)` / `Complete graph`
+  ) |>
+  pivot_longer(-strategy, names_to = "reference", values_to = "skill")
+```
+
+### A fairer comparison: skill
+
+Each strategy on its own series, against forecasts that every series has.
+
+```{r}
+#| fig-width: 12
+#| fig-height: 4.4
+#| out-width: 100%
+favorita_skill |>
+  ggplot(aes(x = reference, y = skill, fill = strategy)) +
+  geom_col(position = position_dodge(width = 0.8), width = 0.7) +
+  geom_text(aes(label = scales::percent(skill, accuracy = 0.1)), position = position_dodge(width = 0.8),
+            vjust = -0.4, size = 7) +
+  scale_fill_manual(values = strategy_colours) +
+  scale_y_continuous(labels = scales::percent, expand = expansion(mult = c(0, 0.15))) +
+  labs(x = NULL, y = "sCRPS skill", fill = NULL) +
+  theme(panel.grid.major.x = element_blank(), axis.text.x = element_text(size = 22))
+```
+
+::: {.fragment .fade-up}
+::: {.callout-tip}
+## Both beat reconciling everything
+
+By about `r scales::percent(mean(filter(favorita_skill, reference == "vs reconciling everything")$skill))`, and reconciling everything is worse than not reconciling at all. First forecast origin only.
 :::
 :::
 
