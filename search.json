@@ -1,0 +1,443 @@
+[
+  {
+    "objectID": "index.html#section",
+    "href": "index.html#section",
+    "title": "",
+    "section": "",
+    "text": "Graphs for forecasting many related time series\n\n\n23rd October 2026 @ University of Melbourne\n\n\nMitchell O’Hara-Wild, Monash University\n\n\n\n\n\n\n\n\nUseful links\n\n\n social.mitchelloharawild.com\n slides.mitchelloharawild.com/UoM2026\n mitchelloharawild/talk-graph-temporal-uom2026"
+  },
+  {
+    "objectID": "index.html#section-1",
+    "href": "index.html#section-1",
+    "title": "",
+    "section": "",
+    "text": "Forecasting in practice\nRarely just one time series.\n\n\n\n\n\n\n\nMany related series\n\n\nOrganisations forecast large collections of related series, e.g.\n\nvisitors by origin and purpose of travel\npage views by country and device\nproduct sales across stores and regions\n\nThe M5 competition: 42,840 related retail series.\n\n\n\n\n\n\n\n\n\n\n\n\nWhat does software for this look like?\n\n\nMany series and many models, through a single consistent interface."
+  },
+  {
+    "objectID": "index.html#section-2",
+    "href": "index.html#section-2",
+    "title": "",
+    "section": "",
+    "text": "Forecasting is more than fitting a model\n\n\n\n\n\n\n\nConsistent\n\n\nOne interface for every model and every series.\n\n\n\n\n\n\n\n\n\nExtensible\n\n\nNew models and methods slot into the same workflow.\n\n\n\n\n\n\n\n\n\nProbabilistic\n\n\nForecast distributions to directly provide uncertainty."
+  },
+  {
+    "objectID": "index.html#section-3",
+    "href": "index.html#section-3",
+    "title": "",
+    "section": "",
+    "text": "A tidy data model for time series\n\nThe key to forecasting many series with fable\n\n\n\n\n\n\n\n\n\n\ntsibble\n\n\nKey variables identify each series.\n\n\n\n\n\n\n\n\n\n\n\n\n\nmable\n\n\nOne row per series, one column per model specification.\n\n\n\n\n\n\n\n\n\n\n\n\n\nfable\n\n\nProbabilistic forecasts for each series and model.\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nHow are each series related?\n\n\nCollections have structure: totals, and the parts that add up to them."
+  },
+  {
+    "objectID": "index.html#section-4",
+    "href": "index.html#section-4",
+    "title": "",
+    "section": "",
+    "text": "The basics of reconciliation\n\n\n\n\n\n\n\nHow many tourists will visit Melbourne?\n\n\n\nForecast \\(\\text{Visitors}_{T+h|T}\\) with a suitable model and data.\n\n\n\n\n\n\n\n\n\n\n\n\n\nHow many visitors are from Australia and overseas?\n\n\n\nForecast \\(\\text{Interstate}_{T+h|T}\\) and \\(\\text{International}_{T+h|T}\\) with\nsuitable models and data.\n\n\n\n\n\n\n\n\n\n\n\n\n\nSomething doesn’t add up here…\n\n\nIndependently produced forecasts are incoherent,\n\\(\\text{Visitors}_{T+h|T} \\neq \\text{Interstate}_{T+h|T} + \\text{International}_{T+h|T}\\)."
+  },
+  {
+    "objectID": "index.html#section-5",
+    "href": "index.html#section-5",
+    "title": "",
+    "section": "",
+    "text": "The basics of reconciliation\n\n\n\n\n\n\nImpose constraints to ensure coherency\n\n\nAdjust the forecasts to satisfy\n\\(\\text{Visitors}_{T+h|T} = \\text{Interstate}_{T+h|T} + \\text{International}_{T+h|T}\\)\n\n\n\n\n\n\n\n\n\n\nStructural representation\n\n\n\\[\n\\begin{bmatrix}\n  \\text{Visitors}_{t} \\\\\n  \\text{Interstate}_{t} \\\\\n  \\text{International}_{t} \\\\\n\\end{bmatrix}\n=\n\\begin{bmatrix}\n  1 & 1 \\\\\n  1 & 0\\\\\n  0 & 1 \\\\\n\\end{bmatrix}\n\\begin{bmatrix}\n  \\text{Interstate}_{t} \\\\\n  \\text{International}_{t} \\\\\n\\end{bmatrix}\n\\]\nor compactly, \\(\\mathbf{y}_t = \\mathbf{S} \\mathbf{b}_t\\)\n\n\n\n\n\n\n\n\n\n\n\n\nRelevant paper\n\n\nSumming matrices are described in Hyndman et al. (2011)."
+  },
+  {
+    "objectID": "index.html#section-6",
+    "href": "index.html#section-6",
+    "title": "",
+    "section": "",
+    "text": "The basics of reconciliation\n\n\n\n\n\n\nReconciling forecasts\n\n\nThe L2 optimal adjustment is MinT (Wickramasuriya et al. 2018):\n\\[\n  \\tilde{\\mathbf{y}}_{T+h|T}=\\mathbf{S}(\\mathbf{S}'\\mathbf{W}_{h}^{-1}\\mathbf{S})^{-1}\\mathbf{S}'\\mathbf{W}_{h}^{-1}\\hat{\\mathbf{y}}_{T+h|T}\n\\]\nwhere \\(\\mathbf{W}_{h}=\\text{Var}[\\mathbf{y}_{T+h}-\\hat{\\mathbf{y}}_{T+h|T}]\\).\n\n\n\n\n\n\n\n\n\n\nCoherent forecasts are more accurate\n\n\nNot only more reasonable: information is shared between series.\n\n\n\n\n\nMatrices get unreadable at scale, so let’s use graphs."
+  },
+  {
+    "objectID": "index.html#section-7",
+    "href": "index.html#section-7",
+    "title": "",
+    "section": "",
+    "text": "Hierarchical coherence\n\n\n\n\n\n\nEach aggregate has a single constraint\n\n\nThe basic constraint is hierarchical.\nThe edges correspond to the \\(\\mathbf{S}\\) matrix.\n\n\n\n\n\n\nOrigin"
+  },
+  {
+    "objectID": "index.html#section-8",
+    "href": "index.html#section-8",
+    "title": "",
+    "section": "",
+    "text": "Hierarchical coherence\n\n\n\n\n\n\nEach aggregate has a single constraint\n\n\nHierarchical series often have multiple layers.\n\n\n\n\nIn graph terms, this is a polytree.\n\n\n\n\nOrigin / State"
+  },
+  {
+    "objectID": "index.html#section-9",
+    "href": "index.html#section-9",
+    "title": "",
+    "section": "",
+    "text": "Grouped coherence\nThere are many ways to disaggregate a series.\nWhy do visitors travel: for a holiday or business?\n\n\n\n\n\n\n\n\nWhat about where visitors are from?\n\n\nLet’s consider the combinations.\n\n\n\n\n\n\n\n\nPurpose"
+  },
+  {
+    "objectID": "index.html#section-10",
+    "href": "index.html#section-10",
+    "title": "",
+    "section": "",
+    "text": "Grouped coherence\n\n\n\n\n\n\nConsidering origin and purpose\n\n\nDisaggregate by one, then further by the other.\nA grouped structure has the same top and bottom series.\n\n\n\n\n\n\nOrigin / Purpose and Purpose / Origin"
+  },
+  {
+    "objectID": "index.html#section-11",
+    "href": "index.html#section-11",
+    "title": "",
+    "section": "",
+    "text": "Grouped coherence\n\n\n\n\n\n\nConsidering origin and purpose\n\n\nThe grouped structure can be drawn as a single graph.\nEdge colours show the origin and purpose constraints.\n\n\n\n\nIn graph terms, this is a directed acyclic graph (DAG).\n\n\n\n\nOrigin * Purpose"
+  },
+  {
+    "objectID": "index.html#section-12",
+    "href": "index.html#section-12",
+    "title": "",
+    "section": "",
+    "text": "Structure as a formula\naggregate_key() describes the graph with a symbolic formula, like factors in lm().\n\n\n\n\n\n\nOperators\n\n\n\n\n\nFormula\nMeaning\nExpands to\n\n\n\n\na + b\nseparately\n1 + a + b\n\n\na / b\nnested\n1 + a + a:b\n\n\na * b\ncrossed\n1 + a + b + a:b\n\n\na * b - a\nremove a term\n1 + b + a:b\n\n\n\n\n\n\n\n\n\n\n\n\n\nThe intercept is the total\n\n\n1 (implied) is the common root node (the total)\n0 drops it, leaving disjoint graphs."
+  },
+  {
+    "objectID": "index.html#section-13",
+    "href": "index.html#section-13",
+    "title": "",
+    "section": "",
+    "text": "Grouped coherence in software\nAustralian tourism, by purpose of travel and state.\n\ntourism_agg &lt;- tourism |&gt;\n  aggregate_key(Purpose * State, Trips = sum(Trips))\ntourism_agg\n\n# A tsibble: 3,600 x 4 [1Q]\n# Key:       Purpose, State [45]\n  Quarter Purpose      State         Trips\n    &lt;qtr&gt; &lt;chr*&gt;       &lt;chr*&gt;        &lt;dbl&gt;\n1 1998 Q1 &lt;aggregated&gt; &lt;aggregated&gt; 23182.\n2 1998 Q2 &lt;aggregated&gt; &lt;aggregated&gt; 20323.\n3 1998 Q3 &lt;aggregated&gt; &lt;aggregated&gt; 19827.\n4 1998 Q4 &lt;aggregated&gt; &lt;aggregated&gt; 20830.\n5 1999 Q1 &lt;aggregated&gt; &lt;aggregated&gt; 22087.\n# ℹ 3,595 more rows"
+  },
+  {
+    "objectID": "index.html#section-14",
+    "href": "index.html#section-14",
+    "title": "",
+    "section": "",
+    "text": "Grouped coherence in software\n\nfit &lt;- tourism_agg |&gt;\n  filter_index(~ \"2015 Q4\") |&gt;\n  model(ets = ETS(Trips)) |&gt;\n  mutate(mint = reconcile_mint(ets))\nfit\n\n# A mable: 45 x 4\n# Key:     Purpose, State [45]\n  Purpose  State                       ets         mint\n  &lt;chr*&gt;   &lt;chr*&gt;                  &lt;model&gt;      &lt;model&gt;\n1 Business ACT                &lt;ETS(M,N,M)&gt; &lt;ETS(M,N,M)&gt;\n2 Business New South Wales    &lt;ETS(M,N,A)&gt; &lt;ETS(M,N,A)&gt;\n3 Business Northern Territory &lt;ETS(M,N,A)&gt; &lt;ETS(M,N,A)&gt;\n4 Business Queensland         &lt;ETS(M,N,M)&gt; &lt;ETS(M,N,M)&gt;\n5 Business South Australia    &lt;ETS(M,N,M)&gt; &lt;ETS(M,N,M)&gt;\n# ℹ 40 more rows\n\n\n\nOne row per series, one column per model.\nreconcile_mint() makes the forecasts coherent."
+  },
+  {
+    "objectID": "index.html#section-15",
+    "href": "index.html#section-15",
+    "title": "",
+    "section": "",
+    "text": "Grouped coherence in software\n\nfc &lt;- fit |&gt; forecast(h = \"2 years\")\nfc |&gt;\n  filter(is_aggregated(Purpose), is_aggregated(State)) |&gt;\n  autoplot(tourism_agg |&gt; filter_index(\"2010 Q1\" ~ .), level = 95)\n\n\n\naccuracy(fc, tourism_agg) |&gt;\n  summarise(RMSSE = mean(RMSSE), .by = .model) |&gt;\n  as.data.frame()\n\n  .model    RMSSE\n1    ets 1.170012\n2   mint 1.154311"
+  },
+  {
+    "objectID": "index.html#section-16",
+    "href": "index.html#section-16",
+    "title": "",
+    "section": "",
+    "text": "The structure lives in the key\naggregate_key() produces every implied aggregate.\n\n\nclass(tourism_agg$State)\n\n[1] \"agg_vec\"\n\n\n\n\nKeys are vectors of nodes in a graph.\n\n\n\nkeys &lt;- distinct(tourism_agg, Purpose, State)\ngraphvec::edges(\n  graphvec::agg_df(\n    Purpose = keys$Purpose, State = keys$State\n  )\n) |&gt;\n  head(5)\n\n&lt;edge_vec[5]&gt;\n[1] [Business:&lt;aggregated&gt;]-&gt;[&lt;aggregated&gt;:&lt;aggregated&gt;]\n[2] [Holiday:&lt;aggregated&gt;]-&gt;[&lt;aggregated&gt;:&lt;aggregated&gt;] \n[3] [Other:&lt;aggregated&gt;]-&gt;[&lt;aggregated&gt;:&lt;aggregated&gt;]   \n[4] [Visiting:&lt;aggregated&gt;]-&gt;[&lt;aggregated&gt;:&lt;aggregated&gt;]\n[5] [Business:ACT]-&gt;[&lt;aggregated&gt;:ACT]                  \n\n\n\n\n\n\n\n\n\n\n\nWhat about time?\n\n\nSeries can also be disaggregated by their time index."
+  },
+  {
+    "objectID": "index.html#section-17",
+    "href": "index.html#section-17",
+    "title": "",
+    "section": "",
+    "text": "Temporal coherence\n\n\n\n\n\n\nA time series can be disaggregated by temporal granularity.\n\n\n\n\n\n\n\n\n\n\nRelevant paper\n\n\nTemporal reconciliation is described in Athanasopoulos et al. (2017).\n\n\n\n\n\n\n\n\n\n\n\n\nWhat type of coherence structure is this?\n\n\n\nA polytree, so this structure is hierarchical…\n\n\n\n\n\n\n\n\n\nyear(1L) / quarter(1L) / month(1L)"
+  },
+  {
+    "objectID": "index.html#section-18",
+    "href": "index.html#section-18",
+    "title": "",
+    "section": "",
+    "text": "Temporal coherence\nOther granularities disaggregate the same year.\n\n\n\n\n\n\n\n\n…or is it?\n\n\n\nSame top and bottom series, so temporal coherence is grouped.\n\n\n\n\n\n\n\n\n\nyear(1L) / quarter(1L) / month(1L)\nand\nyear(1L) / month(4L) / month(1L)"
+  },
+  {
+    "objectID": "index.html#section-19",
+    "href": "index.html#section-19",
+    "title": "",
+    "section": "",
+    "text": "Temporal coherence\n\n\n\n\n\n\nTemporal coherence is a DAG\n\n\nEdge colours show the quarterly and four-monthly constraints.\n\n\n\n\nCross-sectional and temporal DAGs combine into a single cross-temporal DAG.\n\n\n\n\nyear(1L) / (quarter(1L) * month(4L)) / month(1L)"
+  },
+  {
+    "objectID": "index.html#section-20",
+    "href": "index.html#section-20",
+    "title": "",
+    "section": "",
+    "text": "Temporal coherence in software\naggregate_index() does the same for time: Melbourne pedestrians, by day, month and year.\n\n\npedestrian |&gt;\n  filter(Sensor == \"Southern Cross Station\") |&gt;\n  select(-Sensor) |&gt;\n  aggregate_index(\n    list(day(1L), month(1L), year(1L)),\n    Count = sum(Count)\n  )\n\n\n# A tsibble: 757 x 3 [!]\n# Key:       .granule [3]\n  Date_Time       .granule  Count\n  &lt;mixtime&gt;       &lt;mixtime&gt; &lt;int&gt;\n1 2015-01-01 AEDT 1 day      2813\n2 2015-01-02 AEDT 1 day      4648\n3 2015-01-03 AEDT 1 day      1428\n# ℹ 754 more rows\n\n\n\n\n\n\n\n\n\nMixed granularities with mixtime\n\n\nTemporal aggregates are keyed by their .granule."
+  },
+  {
+    "objectID": "index.html#section-21",
+    "href": "index.html#section-21",
+    "title": "",
+    "section": "",
+    "text": "Cross-temporal coherence\n\n\n\n\n\n\nEvery series is disaggregated both cross-sectionally and temporally.\nEdge colours show cross-sectional and temporal constraints.\n\n\n\n\n\n\n\n\n\n\nRelevant paper\n\n\nDescribed in Kourentzes and Athanasopoulos (2019) and Di Fonzo and Girolimetto (2023).\n\n\n\n\n\n\n\n\n\n\n\n\nWhat type of coherence structure is this?\n\n\n\nAggregate over time or origin first, so it’s grouped.\n\n\n\n\n\n\n\n\n\nOrigin × year(1L) / quarter(2L)"
+  },
+  {
+    "objectID": "index.html#section-22",
+    "href": "index.html#section-22",
+    "title": "",
+    "section": "",
+    "text": "Cross-temporal coherence in software\naggregate_key() then aggregate_index(): tourism by purpose and state, by quarter, half-year and year.\n\ntourism |&gt;\n  aggregate_key(Purpose * State, Trips = sum(Trips)) |&gt;\n  aggregate_index(\n    list(quarter(1L), quarter(2L), year(1L)),\n    Trips = sum(Trips)\n  )\n\n# A tsibble: 6,300 x 5 [!]\n# Key:       Purpose, State, .granule [135]\n  Quarter   Purpose  State              .granule   Trips\n  &lt;mixtime&gt; &lt;chr*&gt;   &lt;chr*&gt;             &lt;mixtime&gt;  &lt;dbl&gt;\n1 1998 Q1   Business ACT                1 quarter  150. \n2 1998 Q1   Business New South Wales    1 quarter 1148. \n3 1998 Q1   Business Northern Territory 1 quarter   91.6\n# ℹ 6,297 more rows\n\n\n\n\n\n\n\n\n\n45 series × 3 granularities = 135 series in the key."
+  },
+  {
+    "objectID": "index.html#section-23",
+    "href": "index.html#section-23",
+    "title": "",
+    "section": "",
+    "text": "Cross-temporal coherence\nCross-temporal graphs grow quickly.\n\n\n\n\n\n\nAustralian tourism\n\n\n\n45 series by purpose and state\n7 temporal aggregates of each year (year, halves, quarters)\n\n\n\n\n\nThat’s 45 × 7 = 315 coherent forecasts for each year ahead.\n\n\n\n\n\n\n\n\n\nAre all of these series worth forecasting?"
+  },
+  {
+    "objectID": "index.html#section-24",
+    "href": "index.html#section-24",
+    "title": "",
+    "section": "",
+    "text": "Three kinds of coherence\nReconciliation adjusts related forecasts so they add up correctly (coherent).\nRelated time series are described in three ways:\n\n\n\n\n\n📚 Hierarchical\n\n\nOne path from top to bottom.\n\n\n\n\n\n\n\nG\n\n\ncluster_1\n\nBottom\n\n\ncluster_0\n\nUpper\n\n\n\nAX\n\nAX\n\n\n\nAY\n\nAY\n\n\n\nBX\n\nBX\n\n\n\nBY\n\nBY\n\n\n\nTotal\n\nTotal\n\n\n\nA\n\nA\n\n\n\nTotal-&gt;A\n\n\n\n\n\nB\n\nB\n\n\n\nTotal-&gt;B\n\n\n\n\n\nA-&gt;AX\n\n\n\n\n\nA-&gt;AY\n\n\n\n\n\nB-&gt;BX\n\n\n\n\n\nB-&gt;BY\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n📚 Grouped\n\n\nMany paths from top to bottom.\n\n\n\n\n\n\n\nG\n\n\ncluster_2\n\nPath AB\n\n\ncluster_3\n\nPath XY\n\n\ncluster_0\n\nBottom\n\n\ncluster_1\n\nTop\n\n\n\nBY\n\nBY\n\n\n\nBX\n\nBX\n\n\n\nAY\n\nAY\n\n\n\nAX\n\nAX\n\n\n\nTotal\n\nTotal\n\n\n\nA\n\nA\n\n\n\nTotal-&gt;A\n\n\n\n\n\nB\n\nB\n\n\n\nTotal-&gt;B\n\n\n\n\n\nX\n\nX\n\n\n\nTotal-&gt;X\n\n\n\n\n\nY\n\nY\n\n\n\nTotal-&gt;Y\n\n\n\n\n\nA-&gt;AY\n\n\n\n\n\nA-&gt;AX\n\n\n\n\n\nB-&gt;BY\n\n\n\n\n\nB-&gt;BX\n\n\n\n\n\nX-&gt;BX\n\n\n\n\n\nX-&gt;AX\n\n\n\n\n\nY-&gt;BY\n\n\n\n\n\nY-&gt;AY\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n💡 Graph\n\n\nMany paths from (many) top to (many) bottom series.\n\n\n\n\n\n\n\nG\n\n\ncluster_1\n\nUnconstrained XY\n\n\ncluster_2\n\nUnconstrained AB\n\n\ncluster_0\n\nConstrained\n\n\n\nX2\n\nX2\n\n\n\nX1\n\nX1\n\n\n\nY\n\nY\n\n\n\nB2\n\nB2\n\n\n\nB1\n\nB1\n\n\n\nA3\n\nA3\n\n\n\nA2\n\nA2\n\n\n\nA1\n\nA1\n\n\n\nTotal\n\nTotal\n\n\n\nTotal-&gt;Y\n\n\n\n\n\nX\n\nX\n\n\n\nTotal-&gt;X\n\n\n\n\n\nA\n\nA\n\n\n\nTotal-&gt;A\n\n\n\n\n\nB\n\nB\n\n\n\nTotal-&gt;B\n\n\n\n\n\nX-&gt;X2\n\n\n\n\n\nX-&gt;X1\n\n\n\n\n\nA-&gt;A3\n\n\n\n\n\nA-&gt;A2\n\n\n\n\n\nA-&gt;A1\n\n\n\n\n\nB-&gt;B2\n\n\n\n\n\nB-&gt;B1"
+  },
+  {
+    "objectID": "index.html#section-25",
+    "href": "index.html#section-25",
+    "title": "",
+    "section": "",
+    "text": "Graph coherence\nA DAG does not require a common top or bottom series.\n\n\n\n\n\n\n\n\nIs the full generality of DAGs useful?\n\n\n\nYes! Graphs describe structures that hierarchical and grouped coherence cannot:\n\nunbalanced graphs (different bottom series)\ndisjoint graphs (different top series)\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nRelevant paper\n\n\nEquivalent to linearly constrained time series (Girolimetto and Di Fonzo 2023), but far easier to read and manipulate."
+  },
+  {
+    "objectID": "index.html#section-26",
+    "href": "index.html#section-26",
+    "title": "",
+    "section": "",
+    "text": "Unbalanced graphs\nWhat if the bottom series differ?\nThis often occurs with:\n\nseries observed at different temporal granularities\ndifferent approaches to calculating the top series"
+  },
+  {
+    "objectID": "index.html#section-27",
+    "href": "index.html#section-27",
+    "title": "",
+    "section": "",
+    "text": "Unbalanced graphs\n\nSeries observed at different temporal granularities\n\n\n\n\n\n\n\nExample\n\n\nSales is reported quarterly, but Profit and Costs twice yearly.\n\n\n\n\nHigher frequency Sales data informs the less frequent Profit and Costs.\n\n\n\n\nProfit = Sales + -Costs"
+  },
+  {
+    "objectID": "index.html#section-28",
+    "href": "index.html#section-28",
+    "title": "",
+    "section": "",
+    "text": "Unbalanced graphs\n\nDifferent approaches to calculating the top series\n\n\n\n\n\n\n\nExample\n\n\nAustralian GDP is calculated with 3 approaches:\n\nIncome approach (I)\nExpenditure approach (E)\nProduction approach (P)\n\nFor simplicity consider a small part of these graphs.\n\n\n\n\n\n\n\n\n\n\nRelevant paper\n\n\nThis example is used in Athanasopoulos et al. (2020)."
+  },
+  {
+    "objectID": "index.html#section-29",
+    "href": "index.html#section-29",
+    "title": "",
+    "section": "",
+    "text": "Unbalanced graphs\n\nDifferent approaches to calculating the top series\n\n\n\n\n\n\n\nExample\n\n\nTwo approaches to calculating GDP:\n\nIncome approach (I)\nExpenditure approach (E)\n\n\n\n\n\n\n\nGDP = I and GDP = E"
+  },
+  {
+    "objectID": "index.html#section-30",
+    "href": "index.html#section-30",
+    "title": "",
+    "section": "",
+    "text": "Unbalanced graphs\n\nDifferent approaches to calculating the top series\n\n\n\n\n\n\n\nCombined approach\n\n\nTwo constraints on GDP, from the income and expenditure approaches.\n\n\n\n\nNo common bottom series means no \\(\\mathbf{S}\\) matrix.\n\n\n\n\nGDP = I = E"
+  },
+  {
+    "objectID": "index.html#section-31",
+    "href": "index.html#section-31",
+    "title": "",
+    "section": "",
+    "text": "Disjoint graphs\nWhat if there are multiple top series?\n\nThis occurs with:\n\ncross-validation\npartial coherency (e.g. no worldwide total)\n\n\n\n\n\n\n\n\n\nCross-validation\n\n\nFolds can’t be aggregated, so each disjoint graph is reconciled separately.\n\n\n\n\n\n\n\n0 + Fold / Origin"
+  },
+  {
+    "objectID": "index.html#section-32",
+    "href": "index.html#section-32",
+    "title": "",
+    "section": "",
+    "text": "Reconciliation on graphs\nWithout \\(\\mathbf{S}\\), describe the constraints directly.\n\n\n\n\n\n\nEach disaggregation is a constraint\n\n\nEvery parent and set of children gives a row of \\(\\mathbf{C}\\),\n\\[\ny_{\\text{parent},t} - \\sum_{j \\in \\text{children}} y_{j,t} = 0\n\\quad\\Rightarrow\\quad\n\\mathbf{C}\\mathbf{y}_t = \\mathbf{0}.\n\\]\n\n\n\n\n\n\n\n\n\n\nReconcile by projection\n\n\n\\[\n\\tilde{\\mathbf{y}}_{T+h|T} = \\left(\\mathbf{I} - \\mathbf{W}_h\\mathbf{C}'(\\mathbf{C}\\mathbf{W}_h\\mathbf{C}')^{+}\\mathbf{C}\\right)\\hat{\\mathbf{y}}_{T+h|T}\n\\]\nNo top or bottom series needed, and equivalent to MinT for hierarchical or grouped graphs."
+  },
+  {
+    "objectID": "index.html#section-33",
+    "href": "index.html#section-33",
+    "title": "",
+    "section": "",
+    "text": "Exploring data with graphs\nGraphs show the structure of the data.\n\n\n\n\n\n\nOne node per series\n\n\nEach edge disaggregates a series.\n\nNesting regions within states deepens the tree.\n\n\n\n\n\n\n\n\n\n\n\nToo many series\n\n\nCrossing with purpose gives 425 series.\nThe structure is lost in the tangle.\n\n\n\n\n\n\n\nState\n\n\n\n\n\n\n\n\n\n\nState / Region\n\n\n\n\n\n\n\n\n\n\nPurpose * (State / Region)"
+  },
+  {
+    "objectID": "index.html#section-34",
+    "href": "index.html#section-34",
+    "title": "",
+    "section": "",
+    "text": "The dimension graph\n\n\n\n\n\n\nA graph of dimensions\n\n\nNodes are combinations of keys, not series.\nEach edge disaggregates by one more key.\n\n\n\n\nTourism has 6 nodes, but 425 series.\n\n\n\n\nPurpose * (State / Region)"
+  },
+  {
+    "objectID": "index.html#section-35",
+    "href": "index.html#section-35",
+    "title": "",
+    "section": "",
+    "text": "The dimension graph\n\n\n\n\n\n\nVisualising features\n\n\nNode fill shows the number of series.\n\n\n\n\n304 of the 425 series sit in the deepest node.\n\n\nAny summary of a node’s series can be shown this way, e.g. zeros, noise or forecast accuracy.\n\n\n\n\nPurpose * (State / Region)"
+  },
+  {
+    "objectID": "index.html#section-37",
+    "href": "index.html#section-37",
+    "title": "",
+    "section": "",
+    "text": "Recap\n\n\n\n\n\n\nCoherence and graph theory\n\n\n\nHierarchical coherence is a polytree.\nGrouped coherence is a restricted DAG.\nGraph coherence is an unrestricted DAG.\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nGraphs bring\n\n\n\nefficient graph algorithms\nvisualisation of structured time series\na familiar grammar for coherent data\n\n\n\n\n\n\n\n\n\n\n\n\n\nWhat about much bigger graphs?\n\n\nClicking through 425 tourism series is easy. Real collections have far more."
+  },
+  {
+    "objectID": "index.html#section-38",
+    "href": "index.html#section-38",
+    "title": "",
+    "section": "",
+    "text": "Breadth vs depth\nEach disaggregating dimension adds useful information.\n\nimproves forecast accuracy\nsupports decision-making\n\n\nTourism by Purpose * State has 45 series.\nAdding Region gives 425.\n\n\n\n\n\n\n\n\nThe curse of dimensionality\n\n\nGrouped structures need every combination of every dimension.\nThe number of series grows exponentially with each dimension."
+  },
+  {
+    "objectID": "index.html#section-39",
+    "href": "index.html#section-39",
+    "title": "",
+    "section": "",
+    "text": "Breadth vs depth\nHierarchical: a global supply chain, disaggregated by location.\n\n\n\n\n\nDimension\nNew series\nTotal series\n\n\n\n\nGlobal\n1\n1\n\n\nContinent\n7\n8\n\n\nCountries\n200\n208\n\n\nStates/Provinces\n4,000\n4,208\n\n\nCounties/Districts/Councils\n40,000\n44,208\n\n\nSuburbs/Towns/Neighbourhoods\n200,000\n244,208\n\n\n\n\n\n\nGrows exponentially with depth, at a rate set by the branching factor."
+  },
+  {
+    "objectID": "index.html#section-40",
+    "href": "index.html#section-40",
+    "title": "",
+    "section": "",
+    "text": "Breadth vs depth\nGrouped: the same supply chain, crossed with every other dimension.\n\n\n\n\n\nDimension\nLevels\nCount\nNew series\nTotal series\n\n\n\n\nTotal\n\n0\n1\n1\n\n\nWarehouse\nApex, Titan, ...\n83\n83\n84\n\n\nPackaging\nLetter, Pouch, Box, ...\n5\n420\n504\n\n\nWeight\nLight, Medium, Heavy\n3\n1,512\n2,016\n\n\nSize\nSmall, Medium, Large\n3\n6,048\n8,064\n\n\nTransport\nAir, Land, Sea\n3\n24,192\n32,256\n\n\nDangerous goods\nExplosive, Radioactive, ...\n9\n290,304\n322,560\n\n\nClass\nRegular, Expedited, ...\n5\n1,612,800\n1,935,360\n\n\nPayment type\nCredit, Cheque, Transfer, ...\n4\n7,741,440\n9,676,800\n\n\nVMI type\nBasic, Collaborative, Advanced, ...\n4\n38,707,200\n48,384,000\n\n\n\n\n\n\nEvery combination of every dimension, so it grows even faster."
+  },
+  {
+    "objectID": "index.html#section-41",
+    "href": "index.html#section-41",
+    "title": "",
+    "section": "",
+    "text": "Forecasting textbook pageviews\nGoogle Analytics data for the Forecasting: Principles and Practice textbook.\n\n\n\n\n\n\nData overview\n\n\n\nDaily page views since 1 January 2020\nMany dimensions: location, device, page, …\n\n\n\n\nStarting small with\ndeviceCategory * (continent / subContinent / country)\ngives 1,028 time series.\n\nToo many to click through: let’s walk the graph."
+  },
+  {
+    "objectID": "index.html#section-43",
+    "href": "index.html#section-43",
+    "title": "",
+    "section": "",
+    "text": "Quality vs quantity\nInformation quality varies with disaggregation depth.\n\naggregates have clear, strong patterns\ndisaggregates are intermittent and noisy\n\n\nLarge structures are dominated by deeply disaggregated series.\n\n\n\n\n\n\nModel misspecification at scale\n\n\nDeeply disaggregated series are hard to forecast accurately, and can worsen reconciliation.\nMinT’s \\(\\mathbf{W}_h\\) is estimated from every series’ errors."
+  },
+  {
+    "objectID": "index.html#section-44",
+    "href": "index.html#section-44",
+    "title": "",
+    "section": "",
+    "text": "💡 Idea: graph pruning\nMany time series aren’t interesting or useful.\n\n\n\n\n\n\n\nSimply don’t forecast them!\n\n\nRemoving uninformative series gives\n\nless computation\nless model misspecification\nbetter forecast accuracy\n\n\n\n\n\n\n\n\n\n\n\n\nFrom grouped to graph\n\n\nMade possible by graph reconciliation.\nRemoving series breaks grouped coherency, so the relevant constraints must also be removed.\nThe result is an unbalanced graph, with different bottom series."
+  },
+  {
+    "objectID": "index.html#section-45",
+    "href": "index.html#section-45",
+    "title": "",
+    "section": "",
+    "text": "💡 Idea: graph pruning\n\n\n\n\n\n\nMaintaining coherency\n\n\nEach disaggregation is all or nothing.\nAn unwanted series can’t be removed if its siblings are kept.\n\n\n\n\nTwo decisions:\n\nThe predicate: is this series ‘forecastable’?\nThe pruning rule: are these disaggregates kept?"
+  },
+  {
+    "objectID": "index.html#section-46",
+    "href": "index.html#section-46",
+    "title": "",
+    "section": "",
+    "text": "The graph pruning procedure\n\n\n\n\n\n\nFeature-based graph search\n\n\n\nStart from the top series.\nDisaggregate, and test each child with the predicate.\nThe pruning rule keeps all children, or none.\nRepeat below kept series, until none remain.\nDerive the pruned coherency constraints.\n\n\n\n\n\n\n\n\n\n\n\nFeatures of ‘forecastability’\n\n\n\nscale (average value)\nintermittency (proportion of zeroes)\nvolatility (coefficient of variation)\nstructure (strength of seasonality)\ngraph features (depth, centrality)"
+  },
+  {
+    "objectID": "index.html#section-49",
+    "href": "index.html#section-49",
+    "title": "",
+    "section": "",
+    "text": "More dimensions\n\n\n\n\n\n\nThe big picture\n\n\nThe raw pageview events have 100s of dimensions.\nA slightly larger structure:\noperatingSystem * browser * language *\n  newVsReturning * pageTitle * deviceCategory *\n  (continent / country / city)\nhas a total of…\n\n\n\n\n\n\n\n171,076,181,621,760 series!\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nPruning to depth 3\n\n\n208,984 series, keeping every dimension."
+  },
+  {
+    "objectID": "index.html#section-50",
+    "href": "index.html#section-50",
+    "title": "",
+    "section": "",
+    "text": "Grocery sales at scale\nCorporación Favorita: product sales across stores and regions of Ecuador.\n\n\n\n\n\n\nData overview\n\n\n\n(perishable/family/class/item_nbr)*\n(((state/city)*type*cluster)/store_nbr)\n\n\n65 aggregation nodes, up to 9 levels deep\n1,277,667 time series\nETS base forecasts, 12 months ahead, 3 forecast origins"
+  },
+  {
+    "objectID": "index.html#section-51",
+    "href": "index.html#section-51",
+    "title": "",
+    "section": "",
+    "text": "The dimension graph\n\n\n\n\n\n\nSeries per node\n\n\n65 nodes, 1,277,667 series.\n\n\n\n\nThe deepest node alone holds 174,162 series.\n\n\n\n\n(perishable/family/class/item_nbr) *(((state/city)*type*cluster)/store_nbr)\n\n\n\n\n\n\n\n\n1\n\n174,162\nseries"
+  },
+  {
+    "objectID": "index.html#section-52",
+    "href": "index.html#section-52",
+    "title": "",
+    "section": "",
+    "text": "Forecasting everything: time\nAll 1,277,667 series, for one forecast origin.\n\n\n\n\n\nStage\nWork\nTime\n\n\n\n\nBase forecasts (ETS)\n1,277,667 models\n75.4 h\n\n\nSample paths\n3,000 paths × 12 months\n61.2 h\n\n\nReconcile means\n1.73M constraints\n18.7 h\n\n\nReconcile sample paths\n3,000 draws\n64.8 h\n\n\nTotal\nper forecast origin\n~220 h ≈ 9 days\n\n\n\n\n\n\n\n\n\n\n\n\nOnly monthly data, one model\n\n\nDaily data, or choosing between several models, multiplies it."
+  },
+  {
+    "objectID": "index.html#section-53",
+    "href": "index.html#section-53",
+    "title": "",
+    "section": "",
+    "text": "Forecasting everything: memory\nAll \\(n\\) = 1,277,667 series, 8 bytes per number.\n\n\n\n\n\nNeeded for\nMatrix size\nMemory\n\n\n\n\nPoint forecasts\nn × 12 months\n122.7 MB\n\n\nProbabilistic forecasts (sample paths)\nn × 12 × 3,000 draws\n368.0 GB\n\n\nReconciling, diagonal weights\nn × n projection\n13.1 TB\n\n\nReconciling, full weights (shrinkage)\nn × n weights + projection\n26.1 TB\n\n\n\n\n\n\nSo in practice, nobody forecasts all of it."
+  },
+  {
+    "objectID": "index.html#section-54",
+    "href": "index.html#section-54",
+    "title": "",
+    "section": "",
+    "text": "Fewer dimensions\nThe usual approach: keep every series in a few dimensions.\n\n\n\n\n\n\n24 of 65 nodes, 5,764 series\n\n\nFor each state \\(s\\), store type \\(t\\), cluster \\(c\\) and perishability \\(p\\):\n\\[\n\\begin{aligned}\ny_{\\text{Total}} &= \\textstyle\\sum_{s} y_{s} \\\\\ny_{s} &= \\textstyle\\sum_{t,\\, c} y_{s,\\, t,\\, c} \\\\\ny_{s,\\, t,\\, c} &= \\textstyle\\sum_{p} y_{p,\\, s,\\, t,\\, c}\n\\end{aligned}\n\\]\n\n\n\n\n\n\n\n\n\n\nNo items, no stores\n\n\nNo forecasts for any product or any store.\n\n\n\n\n\n\n\n(perishable/family)*state*type*cluster\n\n\n\n\n\n\n\n\n1\n\n174,162\nseries"
+  },
+  {
+    "objectID": "index.html#section-55",
+    "href": "index.html#section-55",
+    "title": "",
+    "section": "",
+    "text": "Pruning\nA similar budget, searched across every dimension.\n\n\n\n\n\n\n61 of 65 nodes, 6,176 series\n\n\nIn Los Rios, deli item \\(i\\) (732007) is split by city, item \\(j\\) (732006) isn’t:\n\\[\n\\begin{aligned}\ny_{i,\\, \\text{LR}} &= y_{i,\\, \\text{Babahoyo}} + y_{i,\\, \\text{Quevedo}} \\\\\ny_{j,\\, \\text{LR}} &\\quad \\text{(pruned)}\n\\end{aligned}\n\\]\n\n\n\n\n\n\n\n\n\n\nEvery dimension kept\n\n\nItem and store forecasts, where they are forecastable.\n\n\n\n\n\n\n\nsd(sales) / mean(sales) ≤ 0.4keep a split if &gt;75% of its series pass\n\n\n\n\n\n\n\n\n1\n\n174,162\nseries"
+  },
+  {
+    "objectID": "index.html#section-56",
+    "href": "index.html#section-56",
+    "title": "",
+    "section": "",
+    "text": "Two ways to spend ~6,000 series\n\n\n\nFewer dimensions24 of 65 nodes, 5,764 series\n\n\n\n\n\n\n\n\n\nPruning61 of 65 nodes, 6,176 series\n\n\n\n\n\n\n\n\n\n\n\n1\n\n174,162\nseries\n\n\n\n\nGrouped constraints drop dimensions; graph constraints drop series."
+  },
+  {
+    "objectID": "index.html#section-57",
+    "href": "index.html#section-57",
+    "title": "",
+    "section": "",
+    "text": "Cost of each strategy: time\nOne forecast origin.\n\n\n\n\n\nStage\nFewer dimensions (5,764)\nPruning (6,176)\n\n\n\n\nChoose series and constraints\n&lt;1 s\n5 s\n\n\nBase forecasts (ETS)\n29 min\n42 min\n\n\nSample paths\n18 min\n19 min\n\n\nReconcile means\n2 s\n&lt;1 s\n\n\nReconcile sample paths\n8 s\n5 s\n\n\nTotal\n46 min\n1.0 h\n\n\nComplete, for comparison\n~220 h ≈ 9 days\n\n\n\n\n\n\n\n\n\n\n\nBoth are feasible\n\n\nMore than 200\\(\\times\\) cheaper than forecasting everything."
+  },
+  {
+    "objectID": "index.html#section-58",
+    "href": "index.html#section-58",
+    "title": "",
+    "section": "",
+    "text": "Cost of each strategy: memory\n8 bytes per number.\n\n\n\n\n\nNeeded for\nFewer dimensions (5,764)\nPruning (6,176)\n\n\n\n\nPoint forecasts\n553.3 kB\n592.9 kB\n\n\nProbabilistic forecasts (sample paths)\n1.7 GB\n1.8 GB\n\n\nReconciling, diagonal weights\n265.8 MB\n305.1 MB\n\n\nReconciling, full weights (shrinkage)\n531.6 MB\n610.3 MB\n\n\nTotal (with full weights)\n2.2 GB\n2.4 GB\n\n\nComplete, for comparison\n26.5 TB\n\n\n\n\n\n\n\n\n\n\n\nGigabytes, not terabytes\n\n\nFull shrinkage weights become feasible again."
+  },
+  {
+    "objectID": "index.html#section-59",
+    "href": "index.html#section-59",
+    "title": "",
+    "section": "",
+    "text": "Which forecasts are more accurate?\nEach strategy scored on its own series, lower is better.\n\n\n\n\n\n\n\n\nPruned forecasts are slightly more accurate\n\n\n4.0% lower sCRPS before reconciling, 2.4% after."
+  },
+  {
+    "objectID": "index.html#section-60",
+    "href": "index.html#section-60",
+    "title": "",
+    "section": "",
+    "text": "Not a fair comparison\n\nDifferent series: the gap is there before reconciling\nPruning keeps forecastable series by design\nOnly ~310 series in common per origin\n\n\n\n\n\n\n\n\nBut pruned forecasts are more useful\n\n\nItem and store forecasts, which is where ordering decisions happen."
+  },
+  {
+    "objectID": "index.html#section-61",
+    "href": "index.html#section-61",
+    "title": "",
+    "section": "",
+    "text": "Like for like: shared series\n920 series in both sets over 3 origins, all inside fewer dimensions’ 24 nodes.\n\n\n\n\n\n\n\n\nFewer dimensions’ home ground\n\n\nIt reconciles the shared aggregates better. Pruning’s gains come from the series only it keeps."
+  },
+  {
+    "objectID": "index.html#section-62",
+    "href": "index.html#section-62",
+    "title": "",
+    "section": "",
+    "text": "A fairer comparison: skill\nEach strategy on its own series, against forecasts that every series has.\n\n\n\n\n\n\n\n\nBoth beat reconciling everything\n\n\nBy about 7%, and reconciling everything is worse than not reconciling at all. First forecast origin only."
+  },
+  {
+    "objectID": "index.html#section-63",
+    "href": "index.html#section-63",
+    "title": "",
+    "section": "",
+    "text": "More dimensions\nGraph pruning changes what’s possible in reconciliation.\n\n\n\n\n\n\nGrouped constraints\n\n\nRequire a common bottom series, so all disaggregates are forecast.\nTo keep the data small, useful dimensions are dropped.\n\n\n\n\n\n\n\n\n\n\nGraph constraints\n\n\nAny structure is coherent.\nTo keep the data small, useless series are dropped."
+  },
+  {
+    "objectID": "index.html#section-64",
+    "href": "index.html#section-64",
+    "title": "",
+    "section": "",
+    "text": "Final comments\n\n\n\n\n\n\nKey ideas\n\n\n\nKeys and mables scale forecasting to many series\nGraphs describe, reconcile and explore any structure\nPrune uninformative series, keep useful dimensions\n\n\n\n\n\n\n\n\n\n\n\n\nFuture work\n\n\n\nBetter measures of ‘forecastability’\nLumping uninformative series into ‘other’\nA graph vocabulary for selecting series\nTemporal and cross-temporal graphs\nFinishing the software"
+  },
+  {
+    "objectID": "index.html#thanks-for-your-time",
+    "href": "index.html#thanks-for-your-time",
+    "title": "",
+    "section": "Thanks for your time!",
+    "text": "Thanks for your time!\n\n\n\n\n\n\n\n\n\nUseful links\n\n\n social.mitchelloharawild.com\n slides.mitchelloharawild.com/UoM2026\n mitchelloharawild/talk-graph-temporal-uom2026"
+  },
+  {
+    "objectID": "index.html#references",
+    "href": "index.html#references",
+    "title": "",
+    "section": "References",
+    "text": "References\n\n\n\n\nAthanasopoulos, George, Puwasala Gamakumara, Anastasios Panagiotelis, Rob J. Hyndman, and Mohamed Affan. 2020. “Hierarchical Forecasting.” In Macroeconomic Forecasting in the Era of Big Data: Theory and Practice, edited by Peter Fuleky. Springer International Publishing. https://doi.org/10.1007/978-3-030-31150-6_21.\n\n\nAthanasopoulos, George, Rob J. Hyndman, Nikolaos Kourentzes, and Fotios Petropoulos. 2017. “Forecasting with Temporal Hierarchies.” European Journal of Operational Research 262 (1): 60–74. https://doi.org/10.1016/j.ejor.2017.02.046.\n\n\nDi Fonzo, Tommaso, and Daniele Girolimetto. 2023. “Cross-Temporal Forecast Reconciliation: Optimal Combination Method and Heuristic Alternatives.” International Journal of Forecasting 39 (1): 39–57. https://doi.org/10.1016/j.ijforecast.2021.08.004.\n\n\nGirolimetto, Daniele, and Tommaso Di Fonzo. 2023. Point and Probabilistic Forecast Reconciliation for General Linearly Constrained Multiple Time Series. https://arxiv.org/abs/2305.05330.\n\n\nHyndman, Rob J., Roman A. Ahmed, George Athanasopoulos, and Han Lin Shang. 2011. “Optimal Combination Forecasts for Hierarchical Time Series.” Comput. Stat. Data Anal. (NLD) 55 (9): 2579–89. https://doi.org/10.1016/j.csda.2011.03.006.\n\n\nKourentzes, Nikolaos, and George Athanasopoulos. 2019. “Cross-Temporal Coherent Forecasts for Australian Tourism.” Annals of Tourism Research 75: 393–409. https://doi.org/10.1016/j.annals.2019.02.001.\n\n\nWickramasuriya, Shanika L., George Athanasopoulos, and Rob J Hyndman. 2018. “Optimal Forecast Reconciliation for Hierarchical and Grouped Time Series Through Trace Minimization.” Journal of the American Statistical Association 114: 804–19."
+  }
+]
