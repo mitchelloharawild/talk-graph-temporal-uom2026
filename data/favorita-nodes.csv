@@ -1,0 +1,66 @@
+node,label,x,y,complete,pruned
+1,Total,0.0,10,1,1
+2,perishable,-4.5,9,2,2
+3,state,-1.5,9,16,16
+4,type,1.5,9,5,5
+5,cluster,4.5,9,17,17
+6,family,-5.25,8,33,9
+7,city,-0.75,8,22,15
+8,state × type,2.25,8,31,30
+9,state × cluster,3.75,8,37,33
+10,type × cluster,5.25,8,19,19
+11,perishable × state,-3.75,8,32,32
+12,perishable × type,-2.25,8,10,10
+13,perishable × cluster,0.75,8,34,34
+14,class,-5.45454545454545,7,330,33
+15,city × type,1.09090909090909,7,35,29
+16,city × cluster,4.36363636363636,7,41,33
+17,state × type × cluster,5.45454545454545,7,38,34
+18,perishable × city,-2.18181818181818,7,44,30
+19,perishable × state × type,0.0,7,62,60
+20,perishable × state × cluster,2.18181818181818,7,74,66
+21,perishable × type × cluster,3.27272727272727,7,38,38
+22,family × state,-4.36363636363636,7,517,140
+23,family × type,-3.27272727272727,7,161,45
+24,family × cluster,-1.09090909090909,7,551,152
+25,item_nbr,-5.5,6,4000,188
+26,city × type × cluster,5.5,6,42,35
+27,perishable × city × type,0.5,6,70,58
+28,perishable × city × cluster,3.5,6,82,66
+29,perishable × state × type × cluster,4.5,6,76,68
+30,family × city,-2.5,6,706,132
+31,family × state × type,-0.5,6,991,262
+32,family × state × cluster,1.5,6,1186,294
+33,family × type × cluster,2.5,6,615,168
+34,class × state,-4.5,6,4831,283
+35,class × type,-3.5,6,1550,152
+36,class × cluster,-1.5,6,5214,500
+37,type × cluster × store_nbr,5.5,5,54,40
+38,perishable × city × type × cluster,4.5,5,84,70
+39,family × city × type,-0.5,5,1118,258
+40,family × city × cluster,2.5,5,1314,294
+41,family × state × type × cluster,3.5,5,1218,303
+42,class × city,-4.5,5,6524,238
+43,class × state × type,-2.5,5,9142,495
+44,class × state × cluster,0.5,5,10990,656
+45,class × type × cluster,1.5,5,5806,529
+46,item_nbr × state,-5.5,5,53917,290
+47,item_nbr × type,-3.5,5,17233,341
+48,item_nbr × cluster,-1.5,5,58101,334
+49,perishable × type × cluster × store_nbr,5.33333333333333,4,108,80
+50,family × city × type × cluster,4.0,4,1345,312
+51,class × city × type,-2.66666666666667,4,10311,479
+52,class × city × cluster,1.33333333333333,4,12166,618
+53,class × state × type × cluster,2.66666666666667,4,11287,689
+54,item_nbr × city,-5.33333333333333,4,71370,255
+55,item_nbr × state × type,-4.0,4,98315,294
+56,item_nbr × state × cluster,-1.33333333333333,4,119017,403
+57,item_nbr × type × cluster,0.0,4,64061,382
+58,family × type × cluster × store_nbr,4.8,3,1729,357
+59,class × city × type × cluster,2.4,3,12456,686
+60,item_nbr × city × type,-4.8,3,110697,311
+61,item_nbr × city × cluster,-2.4,3,131441,407
+62,item_nbr × state × type × cluster,0.0,3,121870,467
+63,class × type × cluster × store_nbr,3.0,2,16101,821
+64,item_nbr × city × type × cluster,-3.0,2,134217,490
+65,item_nbr × type × cluster × store_nbr,0.0,1,174162,444

@@ -2001,6 +2001,44 @@ has a total of...
 
 ## {}
 
+```{r}
+#| include: false
+# Series per dimension-graph node, complete and pruned (cut-100, first origin),
+# with the graph's layout, from the Favorita application of mitchelloharawild/paper-graph-pruning
+favorita_nodes <- read_csv("data/favorita-nodes.csv", show_col_types = FALSE)
+favorita_edges <- read_csv("data/favorita-edges.csv", show_col_types = FALSE)
+# One log scale for both graphs, so a colour means the same count before and after pruning
+favorita_fill <- scales::col_numeric(
+  c(deck_colours[["panel"]], level_colours[[2]]),
+  domain = log(range(favorita_nodes$complete)), na.color = "white"
+)
+visnetwork_favorita <- function(n) {
+  favorita_nodes |>
+    transmute(
+      id = node, x = x * 62, y = -y * 56,
+      title = paste0(label, "<br>", scales::comma(n), " series"),
+      color.background = favorita_fill(if_else(n > 0, log(n), NA)),
+      color.border = deck_colours[["ink"]]
+    ) |>
+    visNetwork(favorita_edges, width = 744, height = 560) |>
+    visPhysics(enabled = FALSE) |>
+    visEdges(width = 1, smooth = FALSE, arrows = list(to = list(scaleFactor = 0.4)),
+             color = list(color = deck_colours[["grey"]], opacity = 0.35)) |>
+    visNodes(shape = "dot", size = 14, borderWidth = 1.5, font = list(size = 0)) |>
+    visInteraction(dragView = FALSE, zoomView = FALSE, hover = TRUE)
+}
+favorita_legend <- htmltools::div(
+  style = "display: flex; align-items: center; gap: 12px; justify-content: center; font-size: 20px;",
+  "1",
+  htmltools::div(style = sprintf(
+    "width: 240px; height: 14px; background: linear-gradient(to right, %s, %s);",
+    deck_colours[["panel"]], level_colours[[2]]
+  )),
+  scales::comma(max(favorita_nodes$complete)),
+  "series"
+)
+```
+
 ::: columns
 ::: {.column width="60%"}
 
@@ -2017,8 +2055,8 @@ Corporación Favorita: product sales across stores and regions of Ecuador.
 (((state/city)\*type\*cluster)/store_nbr)
 :::
 
-* 65 aggregation nodes, up to 9 levels deep
-* 361,311 distinct time series
+* `r nrow(favorita_nodes)` aggregation nodes, up to `r n_distinct(favorita_nodes$y) - 1` levels deep
+* `r scales::comma(sum(favorita_nodes$complete))` time series
 * ETS base forecasts, 12 months ahead, 3 forecast origins
 
 :::
@@ -2027,6 +2065,75 @@ Corporación Favorita: product sales across stores and regions of Ecuador.
 :::
 
 ![](backgrounds/aleksandar-radovanovic-mXKXJI98aTE-unsplash.jpg){.image-right}
+
+
+## {}
+
+::: columns
+::: {.column width="57%"}
+:::
+::: {.column width="43%"}
+### The dimension graph
+
+::: {.callout-tip}
+## Series per node
+
+`r nrow(favorita_nodes)` nodes, `r scales::comma(sum(favorita_nodes$complete))` series.
+:::
+
+::: {.fragment .fade-in}
+The deepest node alone holds `r scales::comma(max(favorita_nodes$complete))` series.
+:::
+
+:::
+:::
+
+::: {.figure-left}
+::: {.figure-band}
+(perishable/family/class/item_nbr) \*<br>(((state/city)\*type\*cluster)/store_nbr)
+:::
+
+```{r}
+visnetwork_favorita(favorita_nodes$complete)
+favorita_legend
+```
+:::
+
+
+## {}
+
+::: columns
+::: {.column width="57%"}
+:::
+::: {.column width="43%"}
+### Pruned dimension graph
+
+::: {.callout-note}
+## Pruned with cut-100
+
+* predicate: at least 100 sales every month
+* pruning rule: keep if >75% of disaggregates pass
+:::
+
+::: {.fragment .fade-in}
+`r scales::comma(sum(favorita_nodes$pruned))` of `r scales::comma(sum(favorita_nodes$complete))` series kept.
+
+The deepest nodes are thinned the most.
+:::
+
+:::
+:::
+
+::: {.figure-left}
+::: {.figure-band}
+(perishable/family/class/item_nbr) \*<br>(((state/city)\*type\*cluster)/store_nbr)
+:::
+
+```{r}
+visnetwork_favorita(favorita_nodes$pruned)
+favorita_legend
+```
+:::
 
 
 ## {}
