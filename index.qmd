@@ -1951,51 +1951,47 @@ fpp3_complete_agg_ts |>
 
 ## {}
 
-### Pruning pageviews
-
 ::: columns
-::: {.column width="68%"}
+::: {.column width="60%"}
 
-```{r}
-#| echo: true
-#| eval: false
-pageviews |>
-  prune_aggregates(
-    deviceCategory * (continent / subContinent / country),
-    .predicate = mean(activeUsers) > 10 &
-      mean(activeUsers == 0) < 0.5,
-    .keep = \(x) mean(x) > 0.5,
-    activeUsers = sum(activeUsers)
-  )
-```
+### More dimensions
 
+::: {.callout-note}
+## The big picture
+
+The raw pageview events have 100s of dimensions.
+
+A slightly larger structure:
+
+::: {style='font-family: monospace;'}
+operatingSystem\*browser\*language\*
+
+newVsReturning\*pageTitle\*deviceCategory\*
+
+(continent/country/city)
 :::
-::: {.column width="32%"}
 
-```{r}
-series_depth <- function(x) {
-  x |>
-    key_data() |>
-    transmute(depth = (!is_aggregated(deviceCategory)) + (!is_aggregated(continent)) +
-      (!is_aggregated(subContinent)) + (!is_aggregated(country))) |>
-    count(depth)
-}
-full_join(
-  rename(series_depth(fpp3_complete_agg_ts), Complete = n),
-  rename(series_depth(fpp3_pruned_ts), Pruned = n),
-  by = "depth"
-) |>
-  mutate(Pruned = coalesce(Pruned, 0L), depth = as.character(depth)) |>
-  (\(x) bind_rows(x, summarise(x, depth = "Total", across(c(Complete, Pruned), sum))))() |>
-  gt() |>
-  cols_label(depth = "Depth") |>
-  fmt_number(decimals = 0) |>
-  tab_options(table.font.size = 26) |>
-  tab_style(cell_text(color = "#084887", weight = 600), cells_body(columns = Pruned))
-```
+has a total of...
+
+:::{.fragment .fade-in}
+::: {.callout-important}
+[**171,076,181,621,760** series!]{style='font-size: 50px'}
+:::
+:::
+:::
+
+::: {.fragment .fade-in}
+::: {.callout-tip}
+## Pruning to depth 3
+
+**208,984** series, keeping every dimension.
+:::
+:::
 
 :::
 :::
+
+![](backgrounds/megan-o-hanlon-vwvnZ-jSo98-unsplash.jpg){.image-right}
 
 
 <!-- ---------------------------------------------------------------------- -->
@@ -2160,51 +2156,6 @@ supply_chain |>
 ::: {.fragment .fade-up}
 Every dimension kept, a fraction of the series.
 :::
-
-
-## {}
-
-::: columns
-::: {.column width="60%"}
-
-### More dimensions
-
-::: {.callout-note}
-## The big picture
-
-The raw pageview events have 100s of dimensions.
-
-A slightly larger structure:
-
-::: {style='font-family: monospace;'}
-operatingSystem\*browser\*language\*
-
-newVsReturning\*pageTitle\*deviceCategory\*
-
-(continent/country/city)
-:::
-
-has a total of...
-
-:::{.fragment .fade-in}
-::: {.callout-important}
-[**171,076,181,621,760** series!]{style='font-size: 50px'}
-:::
-:::
-:::
-
-::: {.fragment .fade-in}
-::: {.callout-tip}
-## Pruning to depth 3
-
-**208,984** series, keeping every dimension.
-:::
-:::
-
-:::
-:::
-
-![](backgrounds/megan-o-hanlon-vwvnZ-jSo98-unsplash.jpg){.image-right}
 
 
 ## {}
