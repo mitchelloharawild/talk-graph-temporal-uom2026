@@ -418,3 +418,11 @@ details {
   font-size: 24px;
   color: $deck-grey;
 }
+
+/* Code beside its output: the code is usually the wider of the two */
+.reveal .columns.column-output-location > .column:first-child {
+  width: 58% !important;
+}
+.reveal .columns.column-output-location > .column:last-child {
+  width: 42% !important;
+}

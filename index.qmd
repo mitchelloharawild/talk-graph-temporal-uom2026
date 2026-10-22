@@ -993,11 +993,11 @@ Temporal aggregates are keyed by their `.granule`.
 ::: {.callout-note}
 Every series is disaggregated both cross-sectionally and temporally.
 
-Edge colours show the [cross-sectional]{style="color: #1B998B;"} and [temporal]{style="color: #C33C8A;"} constraints.
+Edge colours show [cross-sectional]{style="color: #1B998B;"} and [temporal]{style="color: #C33C8A;"} constraints.
 :::
 
 ::: {.callout-paper}
-Cross-temporal reconciliation is described in @kourentzes2019cross and @difonzo2023cross.
+Described in @kourentzes2019cross and @difonzo2023cross.
 :::
 
 ::: {.fragment .fade-in}
@@ -1543,7 +1543,7 @@ Folds can't be aggregated, so each disjoint graph is reconciled separately.
 ::: {.fragment .fade-in fragment-index=2}
 ```{r}
 tidygraph::tbl_graph(
-  nodes = tibble(label = paste0(c("Visitors", "Interstate", "International"), "\n(fold ", rep(1:3, each = 3), ")")),
+  nodes = tibble(label = paste0(c("Visitors", "Interstate", "Int'l"), "\n(fold ", rep(1:3, each = 3), ")")),
   edges = tibble(from = c(1, 1, 4, 4, 7, 7), to = c(2, 3, 5, 6, 8, 9))
 ) |>
   visnetwork_graph(width = 740, height = 400) |>
@@ -2019,9 +2019,9 @@ Google Analytics data for the *Forecasting: Principles and Practice* textbook.
 
 Starting small with
 
-::: {style='font-family: monospace;'}
-deviceCategory\*(continent/subContinent/country)
-:::
+```{.r code-line-numbers="false"}
+deviceCategory * (continent / subContinent / country)
+```
 
 gives `r scales::comma(n_keys(fpp3_complete_agg_ts))` time series.
 
@@ -2245,13 +2245,11 @@ The raw pageview events have 100s of dimensions.
 
 A slightly larger structure:
 
-::: {style='font-family: monospace;'}
-operatingSystem\*browser\*language\*
-
-newVsReturning\*pageTitle\*deviceCategory\*
-
-(continent/country/city)
-:::
+```r
+operatingSystem * browser * language *
+  newVsReturning * pageTitle * deviceCategory *
+  (continent / country / city)
+```
 
 has a total of...
 
