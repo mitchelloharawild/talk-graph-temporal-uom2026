@@ -216,9 +216,9 @@ Rarely just one time series.
 
 Organisations forecast large collections of related series, e.g.
 
-* product sales across stores and regions
 * visitors by origin and purpose of travel
 * page views by country and device
+* product sales across stores and regions
 
 The M5 competition: 42,840 related retail series.
 :::
@@ -473,9 +473,7 @@ Not only more reasonable: information is shared between series.
 :::
 
 ::: {.fragment .fade-in}
-These matrices quickly become unreadable for large collections.
-
-Let's instead consider **graphs**.
+Matrices get unreadable at scale, so let's use **graphs**.
 :::
 
 :::
@@ -1259,15 +1257,11 @@ $$
 ::: {.callout-tip}
 ## Reconcile by projection
 
-No top or bottom series needed:
-
 $$
 \tilde{\mathbf{y}}_{T+h|T} = \left(\mathbf{I} - \mathbf{W}_h\mathbf{C}'(\mathbf{C}\mathbf{W}_h\mathbf{C}')^{+}\mathbf{C}\right)\hat{\mathbf{y}}_{T+h|T}
 $$
 
-Redundant constraints are handled by the generalised inverse.
-
-Equivalent to MinT when the graph is hierarchical or grouped.
+No top or bottom series needed, and equivalent to MinT for hierarchical or grouped graphs.
 :::
 :::
 
@@ -1627,9 +1621,7 @@ Google Analytics data for the *Forecasting: Principles and Practice* textbook.
 ## Data overview
 
 * Daily page views since 1 January 2020
-* Disaggregated by *many* dimensions
-
-  (location, device, returning visit, web page, ...)
+* Many dimensions: location, device, page, ...
 
 :::
 
@@ -1908,7 +1900,7 @@ full_join(
 
 ### Grocery sales at scale
 
-Corporación Favorita: grocery sales across Ecuador.
+Corporación Favorita: product sales across stores and regions of Ecuador.
 
 ::: {.callout-note}
 ## Data overview
@@ -2068,7 +2060,7 @@ Every dimension kept, a fraction of the series.
 ### More dimensions
 
 ::: {.callout-note}
-## :earth_asia: The big picture
+## The big picture
 
 The raw pageview events have 100s of dimensions.
 
@@ -2082,7 +2074,7 @@ newVsReturning\*pageTitle\*deviceCategory\*
 (continent/country/city)
 :::
 
-has a total of... :drum:
+has a total of...
 
 :::{.fragment .fade-in}
 ::: {.callout-important}
@@ -2093,7 +2085,7 @@ has a total of... :drum:
 
 ::: {.fragment .fade-in}
 ::: {.callout-tip}
-## :wastebasket: Pruning to depth 3
+## Pruning to depth 3
 
 **208,984** series, keeping every dimension.
 :::
@@ -2119,7 +2111,7 @@ Graph pruning changes what's possible in reconciliation.
 
 Require a **common bottom series**, so all disaggregates are forecast.
 
-To keep the data small, **useful dimensions are dropped**. :x:
+To keep the data small, **useful dimensions are dropped**.
 :::
 
 ::: {.fragment .fade-in}
@@ -2128,7 +2120,7 @@ To keep the data small, **useful dimensions are dropped**. :x:
 
 Any structure is coherent.
 
-To keep the data small, **useless series are dropped**. :white_check_mark:
+To keep the data small, **useless series are dropped**.
 :::
 :::
 
@@ -2152,10 +2144,9 @@ To keep the data small, **useless series are dropped**. :white_check_mark:
 ::: {.callout-tip}
 ## Key ideas
 
-1. Keys and mables scale forecasting to many series and models
-2. Graphs describe any coherency structure
-3. Be wary of **model misspecification** in large structures
-4. **Prune uninformative series**, keep useful dimensions
+1. Keys and mables scale forecasting to many series
+2. Graphs describe, reconcile and explore any structure
+3. **Prune uninformative series**, keep useful dimensions
 :::
 
 ::: {.fragment .fade-up}
@@ -2163,10 +2154,10 @@ To keep the data small, **useless series are dropped**. :white_check_mark:
 ## Future work
 
 * Better measures of 'forecastability'
-* Lumping uninformative series into an 'other' series
-* A graph vocabulary for specifying which series to keep
+* Lumping uninformative series into 'other'
+* A graph vocabulary for selecting series
 * Temporal and cross-temporal graphs
-* Finishing the software design and implementation
+* Finishing the software
 :::
 :::
 
